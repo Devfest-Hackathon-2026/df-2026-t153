@@ -28,7 +28,7 @@ backend/: main.py（起動・CORS・ルーター登録のみ）config.py routers
 frontend/: app/ components/ lib/（api.ts は /openapi.json から生成した型を使う、env.ts）
 
 ## API契約（変更時は backend/schemas.py を先に直す）
-- POST /api/analyze   multipart(file) → {session_id, scene, objects[], texts[], lineup[]}
+- POST /api/analyze   multipart(image) → {session_id, scene, objects[], texts[], lineup[]}
 - GET  /api/narrate   ?session_id&pick_id → SSE (event: meta|delta|done|error)
 - POST /api/feedback  {session_id, pick_id, rating: boring|fishy|great, comment}
 

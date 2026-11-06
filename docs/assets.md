@@ -17,6 +17,7 @@
 | pillow-heif | HEIC 読み込み | https://github.com/bigcat88/pillow_heif | BSD-3-Clause（同梱 libheif は LGPL-3.0） | 未確認 |
 | Ruff | lint / format（開発のみ） | https://github.com/astral-sh/ruff | MIT | 未確認 |
 | mypy | 型検査（開発のみ） | https://github.com/python/mypy | MIT | 未確認 |
+| pytest | テスト（開発のみ） | https://github.com/pytest-dev/pytest | MIT | 未確認 |
 
 ## Frontend（Node）
 

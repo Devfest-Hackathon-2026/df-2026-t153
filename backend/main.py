@@ -1,6 +1,19 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from config import get_settings, setup_logging
+from routers import analyze
+
+setup_logging()
 
 app = FastAPI(title="SanpoLab API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().allowed_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+app.include_router(analyze.router)
 
 
 @app.get("/healthz")
