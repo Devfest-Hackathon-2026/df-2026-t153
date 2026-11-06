@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+python-multipart
+google-genai
+google-cloud-firestore
+google-cloud-storage
+pillow
+pillow-heif
