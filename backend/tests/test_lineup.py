@@ -40,5 +40,15 @@ def test_orders_by_potential_then_salience_and_caps_at_three() -> None:
     assert build_lineup(objs) == ["c", "b", "d"]
 
 
+def test_falls_back_to_cut_objects_only_when_nothing_is_whole() -> None:
+    objs = [
+        _o("cut", whole=False, potential=4),
+        _o("cut_small", whole=False, salience=2),
+        _o("cut_car", whole=False, kind="transient"),
+    ]
+    assert build_lineup(objs) == ["cut"]
+    assert build_lineup([*objs, _o("ok", potential=1)]) == ["ok"]
+
+
 def test_empty_when_nothing_eligible() -> None:
     assert build_lineup([_o("x", kind="transient")]) == []

@@ -76,3 +76,33 @@ class AnalyzeResponse(BaseModel):
     objects: list[InventoryObject]
     texts: list[InventoryText]
     lineup: list[str] = Field(description="抽選候補の objects[].id（最大3件）")
+
+
+class NarrateMeta(BaseModel):
+    """SSE `meta`: 語りの対象。"""
+
+    pick_id: str
+    name: str
+    box: list[int] = Field(min_length=4, max_length=4)
+
+
+class NarrateSource(BaseModel):
+    title: str
+    uri: str
+
+
+class NarrateDone(BaseModel):
+    """SSE `done`: 語りの末尾。takeaway は区切り行の後ろからサーバが切り出す。"""
+
+    takeaway: str = Field(min_length=1, description="次の散歩で転用できる観察パターン（1つ）")
+    sources: list[NarrateSource] = Field(description="Search grounding の出典")
+    search_entry_html: str | None = Field(
+        default=None, description="Google 検索候補の表示用 HTML（grounding 利用時に表示する）"
+    )
+
+
+class NarrateError(BaseModel):
+    """SSE `error`。status は HTTP ステータス相当。"""
+
+    status: int
+    detail: str

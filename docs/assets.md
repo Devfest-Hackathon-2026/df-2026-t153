@@ -11,6 +11,7 @@
 | Uvicorn | ASGI サーバ | https://github.com/encode/uvicorn | BSD-3-Clause | 未確認 |
 | python-multipart | multipart 受信 | https://github.com/Kludex/python-multipart | Apache-2.0 | 未確認 |
 | google-genai | Vertex AI Gemini SDK | https://github.com/googleapis/python-genai | Apache-2.0 | 未確認 |
+| httpx2 | Gemini 通信切断の例外を捕まえる（google-genai の依存を直接指定） | https://github.com/pydantic/httpx2 | BSD-3-Clause | 未確認 |
 | google-cloud-firestore | Firestore クライアント | https://github.com/googleapis/python-firestore | Apache-2.0 | 未確認 |
 | google-cloud-storage | Cloud Storage クライアント | https://github.com/googleapis/python-storage | Apache-2.0 | 未確認 |
 | Pillow | 画像処理 | https://github.com/python-pillow/Pillow | MIT-CMU (HPND) | 未確認 |

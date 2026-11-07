@@ -1,15 +1,18 @@
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from functools import lru_cache
 
+import httpx2
 from google import genai
 from google.genai import errors, types
 from pydantic import ValidationError
 
 from config import get_settings
 from prompts.inventory import INVENTORY_PROMPT
-from schemas import Inventory
+from prompts.narration import TAKEAWAY_HEADING
+from schemas import Inventory, NarrateDone, NarrateSource
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +28,13 @@ class GeminiError(RuntimeError):
 
 
 class GeminiUnavailableError(GeminiError):
-    """429/503 が再試行後も続いた。ルーターで 503 にする。"""
+    """429/503 が再試行後も続いた、または通信が切れた。ルーターで 503 にする。"""
+
+
+def _connection_error(e: httpx2.TransportError) -> GeminiUnavailableError:
+    # genai raises httpx2 errors as-is on dropped connections and timeouts, not APIError
+    log.error("gemini connection failed", extra={"fields": {"error": type(e).__name__}})
+    return GeminiUnavailableError(f"Gemini connection failed ({type(e).__name__}): {e}")
 
 
 @lru_cache
@@ -34,26 +43,10 @@ def _client() -> genai.Client:
     return genai.Client(vertexai=True, project=s.gcp_project, location=s.gcp_location)
 
 
-async def _generate(jpeg: bytes) -> tuple[types.GenerateContentResponse, int]:
-    s = get_settings()
+async def _with_retry[T](call: Callable[[], Awaitable[T]]) -> tuple[T, int]:
     for attempt in range(len(RETRY_DELAYS) + 1):
         try:
-            res = await _client().aio.models.generate_content(
-                model=s.gemini_flash_model,
-                contents=types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(data=jpeg, mime_type="image/jpeg"),
-                        types.Part.from_text(text=INVENTORY_PROMPT),
-                    ],
-                ),
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=Inventory,
-                    thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
-                ),
-            )
-            return res, attempt
+            return await call(), attempt
         except errors.APIError as e:
             if e.code not in RETRY_STATUS:
                 raise GeminiError(f"Gemini API error {e.code}: {e.message}") from e
@@ -70,12 +63,34 @@ async def _generate(jpeg: bytes) -> tuple[types.GenerateContentResponse, int]:
                 extra={"fields": {"status": e.code, "retry": attempt + 1}},
             )
             await asyncio.sleep(RETRY_DELAYS[attempt])
+        except httpx2.TransportError as e:
+            raise _connection_error(e) from e
     raise AssertionError("unreachable")
+
+
+def _photo_and_text(jpeg: bytes, text: str) -> types.Content:
+    return types.Content(
+        role="user",
+        parts=[
+            types.Part.from_bytes(data=jpeg, mime_type="image/jpeg"),
+            types.Part.from_text(text=text),
+        ],
+    )
 
 
 async def list_inventory(jpeg: bytes) -> Inventory:
     t0 = time.perf_counter()
-    res, retries = await _generate(jpeg)
+    res, retries = await _with_retry(
+        lambda: _client().aio.models.generate_content(
+            model=get_settings().gemini_flash_model,
+            contents=_photo_and_text(jpeg, INVENTORY_PROMPT),
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Inventory,
+                thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
+            ),
+        )
+    )
     log.info(
         "gemini inventory",
         extra={
@@ -93,3 +108,115 @@ async def list_inventory(jpeg: bytes) -> Inventory:
         return Inventory.model_validate_json(res.text)
     except ValidationError as e:
         raise GeminiError(f"Gemini output failed schema validation: {e}") from e
+
+
+class _TakeawaySplitter:
+    """語りを素通しし、TAKEAWAY_HEADING 以降は takeaway として溜める。"""
+
+    def __init__(self) -> None:
+        self._pending = ""
+        self.takeaway: str | None = None
+
+    def feed(self, text: str) -> str:
+        if self.takeaway is not None:
+            self.takeaway += text
+            return ""
+        head, sep, tail = (self._pending + text).partition(TAKEAWAY_HEADING)
+        if sep:
+            self._pending, self.takeaway = "", tail
+            return head
+        # The heading can arrive split across chunks; hold back a suffix that may start it
+        keep = next(
+            (
+                n
+                for n in range(len(TAKEAWAY_HEADING) - 1, 0, -1)
+                if head.endswith(TAKEAWAY_HEADING[:n])
+            ),
+            0,
+        )
+        self._pending = head[len(head) - keep :]
+        return head[: len(head) - keep]
+
+
+async def _open_stream(
+    jpeg: bytes, prompt: str
+) -> tuple[types.GenerateContentResponse, AsyncIterator[types.GenerateContentResponse]]:
+    stream = await _client().aio.models.generate_content_stream(
+        model=get_settings().gemini_flash_model,
+        contents=_photo_and_text(jpeg, prompt),
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
+        ),
+    )
+    # Pull the first chunk here so 429/503 raised on first read are retried too
+    try:
+        return await anext(stream), stream
+    except StopAsyncIteration as e:
+        raise GeminiError("Gemini returned an empty stream") from e
+
+
+async def stream_narration(jpeg: bytes, prompt: str) -> AsyncIterator[str | NarrateDone]:
+    """語りの断片（str）を順に返し、最後に NarrateDone を1つ返す。"""
+    t0 = time.perf_counter()
+    (first, stream), retries = await _with_retry(lambda: _open_stream(jpeg, prompt))
+    splitter = _TakeawaySplitter()
+    sources: dict[str, NarrateSource] = {}
+    queries: list[str] = []
+    entry_html: str | None = None
+    finish_reason: object = None
+
+    async def chunks() -> AsyncIterator[types.GenerateContentResponse]:
+        yield first
+        try:
+            async for res in stream:
+                yield res
+        except errors.APIError as e:
+            raise GeminiError(f"Gemini API error {e.code} mid-stream: {e.message}") from e
+        except httpx2.TransportError as e:
+            raise _connection_error(e) from e
+
+    async for res in chunks():
+        if res.text and (out := splitter.feed(res.text)):
+            yield out
+        cand = res.candidates[0] if res.candidates else None
+        if cand is None:
+            continue
+        finish_reason = cand.finish_reason or finish_reason
+        meta = cand.grounding_metadata
+        if meta is None:
+            continue
+        for chunk in meta.grounding_chunks or []:
+            if chunk.web and chunk.web.uri:
+                title = chunk.web.title or chunk.web.domain or chunk.web.uri
+                sources[chunk.web.uri] = NarrateSource(title=title, uri=chunk.web.uri)
+        queries += meta.web_search_queries or []
+        if meta.search_entry_point and meta.search_entry_point.rendered_content:
+            entry_html = meta.search_entry_point.rendered_content
+
+    log.info(
+        "gemini narration",
+        extra={
+            "fields": {
+                "model": get_settings().gemini_flash_model,
+                "retries": retries,
+                "elapsed_ms": round((time.perf_counter() - t0) * 1000),
+                "finish_reason": str(finish_reason),
+                "sources": len(sources),
+                "search_queries": queries,
+            }
+        },
+    )
+    if splitter.takeaway is None:
+        raise GeminiError(
+            f"narration has no '{TAKEAWAY_HEADING}' line (finish_reason={finish_reason})"
+        )
+    try:
+        done = NarrateDone(
+            takeaway=splitter.takeaway.strip(),
+            sources=list(sources.values()),
+            search_entry_html=entry_html,
+        )
+    except ValidationError as e:
+        raise GeminiError(f"narration takeaway failed validation: {e}") from e
+    yield done
