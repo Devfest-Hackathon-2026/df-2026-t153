@@ -56,3 +56,10 @@
 - 理由：
 - 捨てた理由：(b) 再試行回数がアプリ側から見えず構造化ログに出せない。既定の対象コードは 408/429/500/502/503/504 と広い（SDK の既定は再試行なし） (c) ベンチ中に global でも 429 RESOURCE_EXHAUSTED が出た
 - 見直し条件：
+
+## D-06 frontend の API 型生成ツール（2026-11-07 / ）
+- 候補：(a) openapi-typescript（型だけ生成、fetch は手書き） (b) openapi-typescript + openapi-fetch（型安全な fetch ラッパー） (c) orval（クライアント関数ごと生成。@hey-api/openapi-ts も同系統）
+- 選択：(a) openapi-typescript 7.13.0。`npm run gen:api` で `frontend/lib/api.gen.ts` を生成してコミットし、`lib/api.ts` が型を参照する
+- 理由：
+- 捨てた理由：(b) 実行時の依存が1つ増え、multipart は bodySerializer で自前の FormData、SSE（narrate）には使えず結局一部は手書き (c) 設定と生成コードが大きく、API 3本には過剰
+- 見直し条件：

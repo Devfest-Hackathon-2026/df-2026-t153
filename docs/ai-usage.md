@@ -9,3 +9,4 @@ AIを使った作業ごとに1行追記する。
 | 2026-11-06 | 列挙の速度と漏れ対策 | 速度候補の実測（sample.jpg 各3回）、列挙プロンプトの修正（最低12個・設備インフラ確認・文字は texts へ）、sample.jpg の EXIF 除去、D-01〜03 の下書き | thinking LOW / 最大辺 1024 / 両方 | 未選択（人が選ぶ） | — |
 | 2026-11-06 | thinking LOW 反映・texts 補完・再試行 | LOW の反映と再実測、detail からの texts 補完とテスト、429/503 再試行、D-04/D-05 の下書きを書かせた | 補完: サーバ側正規表現 / schema に text 追加 / 別呼び出し、再試行: アプリ側 / SDK retry_options / なし | サーバ側正規表現、アプリ側再試行（人が指定） | schema 変更は契約変更が要る、SDK 任せは再試行回数をログに出せない |
 | 2026-11-07 | 開発環境の統一 | README に Windows 初回セットアップ節、requirements の == 固定、.nvmrc（26）と CI の Node 26 化、backend/.env.example を作らせた | — | 指示どおり（人が指定） | — |
+| 2026-11-07 | F1 写真送信→box 表示 | page.tsx と PhotoInput / BoxOverlay / Lineup、env.ts、OpenAPI 型生成と api.ts を書かせ、型生成ツールの候補を出させた | openapi-typescript / + openapi-fetch / orval | openapi-typescript（人が選択、D-06） | openapi-fetch: 依存増で multipart・SSE は結局手書き、orval: API 3本には過剰 |

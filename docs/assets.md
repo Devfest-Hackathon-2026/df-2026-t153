@@ -29,6 +29,7 @@
 | TypeScript | 型 | https://github.com/microsoft/TypeScript | Apache-2.0 | 未確認 |
 | ESLint / eslint-config-next | lint（開発のみ） | https://github.com/eslint/eslint | MIT | 未確認 |
 | Prettier | format（開発のみ） | https://github.com/prettier/prettier | MIT | 未確認 |
+| openapi-typescript | OpenAPI から API 型を生成（開発のみ） | https://github.com/openapi-ts/openapi-typescript | MIT | 未確認 |
 
 ## Tooling
 

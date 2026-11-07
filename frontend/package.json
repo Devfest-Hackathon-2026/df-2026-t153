@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:api": "openapi-typescript http://localhost:8080/openapi.json -o lib/api.gen.ts && prettier --write lib/api.gen.ts"
   },
   "dependencies": {
     "next": "^16.0.0",
@@ -18,11 +19,12 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
+    "openapi-typescript": "7.13.0",
     "prettier": "^3.3.3",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0"

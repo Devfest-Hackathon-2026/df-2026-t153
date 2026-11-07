@@ -223,6 +223,7 @@ __marimo__/
 # Secrets
 .env*
 !.env.example
+!.env.local.example
 serviceAccount*.json
 
 # Firebase
