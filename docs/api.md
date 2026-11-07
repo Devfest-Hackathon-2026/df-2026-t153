@@ -7,7 +7,7 @@
 | GET | `/healthz` | なし | `{status: "ok"}` |
 | POST | `/api/analyze` | multipart/form-data（`image`: 写真。JPEG/PNG/HEIC 等） | JSON `{session_id, scene, objects[], texts[], lineup[]}` |
 | GET | `/api/narrate` | query `session_id`, `pick_id` | SSE（`event: meta \| delta \| done \| error`） |
-| POST | `/api/feedback` | JSON `{session_id, pick_id, rating, comment}`（`rating`: `boring \| fishy \| great`） | 未定 |
+| POST | `/api/feedback` | JSON `{session_id, pick_id, rating, comment}`（`rating`: `boring \| fishy \| great`） | 204（本文なし） |
 
 ### /api/analyze の中身
 
@@ -32,6 +32,13 @@
 - `sources`：Search grounding の出典。`uri` は Vertex AI のリダイレクト URL
 - `search_entry_html`：Google 検索候補の表示用 HTML。grounding 利用時は表示が求められている（要件は未確認：https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-search-suggestions）
 - GPS は語りのプロンプトにだけ渡す
+
+### /api/feedback の中身
+
+- `comment` は任意（省略時は空文字）、500 文字まで
+- `pick_id` は `lineup[]` に含まれるものだけ受け付ける（session なし 404 / lineup 外 400 / 値が不正 422）
+- Firestore の `feedback/{session_id}_{pick_id}` に保存。同じ主役への再送は上書き
+- 保存時に主役の `name` / `detail` を `pick_name` / `pick_detail` として写す（session を辿らずに集計できるように）
 
 ## エラー
 

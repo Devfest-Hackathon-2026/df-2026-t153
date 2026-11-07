@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings, setup_logging
-from routers import analyze, narrate
+from routers import analyze, feedback, narrate
 
 setup_logging()
 
@@ -15,6 +15,7 @@ app.add_middleware(
 )
 app.include_router(analyze.router)
 app.include_router(narrate.router)
+app.include_router(feedback.router)
 
 
 @app.get("/healthz")

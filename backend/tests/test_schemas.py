@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from schemas import Inventory
+from schemas import FeedbackRequest, Inventory
 
 
 def _obj(**over: object) -> dict[str, object]:
@@ -78,3 +78,19 @@ def test_texts_are_completed_from_detail() -> None:
         ("みそ醤油蔵", "表札"),
         ("OPEN", "看板"),
     ]
+
+
+def test_feedback_comment_is_optional() -> None:
+    req = FeedbackRequest.model_validate({"session_id": "s", "pick_id": "o1", "rating": "great"})
+    assert req.comment == ""
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"rating": "meh"}, {"comment": "あ" * 501}, {"pick_id": ""}],
+)
+def test_feedback_rejects_invalid(bad: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        FeedbackRequest.model_validate(
+            {"session_id": "s", "pick_id": "o1", "rating": "fishy", **bad}
+        )

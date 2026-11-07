@@ -106,3 +106,15 @@ class NarrateError(BaseModel):
 
     status: int
     detail: str
+
+
+Rating = Literal["boring", "fishy", "great"]
+
+
+class FeedbackRequest(BaseModel):
+    """POST /api/feedback の本文。同じ session_id と pick_id への再送は上書き。"""
+
+    session_id: str = Field(min_length=1)
+    pick_id: str = Field(min_length=1)
+    rating: Rating
+    comment: str = Field(default="", max_length=500)
