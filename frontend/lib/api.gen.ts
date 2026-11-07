@@ -21,6 +21,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/narrate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Narrate */
+    get: operations["narrate_api_narrate_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/feedback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Post Feedback */
+    post: operations["post_feedback_api_feedback_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/healthz": {
     parameters: {
       query?: never;
@@ -62,6 +96,26 @@ export interface components {
     Body_analyze_api_analyze_post: {
       /** Image */
       image: string;
+    };
+    /**
+     * FeedbackRequest
+     * @description POST /api/feedback の本文。同じ session_id と pick_id への再送は上書き。
+     */
+    FeedbackRequest: {
+      /** Session Id */
+      session_id: string;
+      /** Pick Id */
+      pick_id: string;
+      /**
+       * Rating
+       * @enum {string}
+       */
+      rating: "boring" | "fishy" | "great";
+      /**
+       * Comment
+       * @default
+       */
+      comment: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -142,6 +196,69 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["AnalyzeResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  narrate_api_narrate_get: {
+    parameters: {
+      query: {
+        session_id: string;
+        pick_id: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "text/event-stream": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_feedback_api_feedback_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FeedbackRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

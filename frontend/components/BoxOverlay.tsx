@@ -65,7 +65,7 @@ export default function BoxOverlay({
                   height={y2 - y1}
                   fill="none"
                   stroke={hot ? "#dc2626" : "rgba(229,231,235,0.85)"}
-                  strokeWidth={hot ? (o.id === selectedId ? 4 : 2.5) : 1.5}
+                  strokeWidth={hot ? (o.id === selectedId ? 6 : 2.5) : 1.5}
                   vectorEffect="non-scaling-stroke"
                 />
                 <text

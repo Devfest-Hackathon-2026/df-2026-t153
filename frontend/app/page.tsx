@@ -2,85 +2,161 @@
 
 import { useEffect, useRef, useState } from "react";
 import BoxOverlay from "@/components/BoxOverlay";
+import HeroCrop from "@/components/HeroCrop";
 import Lineup from "@/components/Lineup";
+import Narration from "@/components/Narration";
 import PhotoInput from "@/components/PhotoInput";
+import Sources from "@/components/Sources";
+import Takeaway from "@/components/Takeaway";
 import { analyze, ApiError, type AnalyzeResponse } from "@/lib/api";
+import {
+  narrate,
+  type NarrateDone,
+  type NarrateMeta,
+  type NarrateSubscription,
+} from "@/lib/narrate";
 
-type State =
+type AnalyzeState =
   | { phase: "idle" }
   | { phase: "loading" }
   | { phase: "done"; result: AnalyzeResponse }
   | { phase: "error"; message: string };
 
+type NarrateState =
+  | { phase: "idle" }
+  | { phase: "streaming"; meta: NarrateMeta | null; text: string }
+  | { phase: "done"; meta: NarrateMeta | null; text: string; done: NarrateDone }
+  | {
+      phase: "error";
+      meta: NarrateMeta | null;
+      text: string;
+      status: number;
+      detail: string;
+    };
+
+function errorMessage(e: unknown): string {
+  if (e instanceof ApiError) return `${e.status}: ${e.message}`;
+  return e instanceof Error ? e.message : String(e);
+}
+
 export default function Home() {
-  const [state, setState] = useState<State>({ phase: "idle" });
+  const [analysis, setAnalysis] = useState<AnalyzeState>({ phase: "idle" });
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [story, setStory] = useState<NarrateState>({ phase: "idle" });
   const abortRef = useRef<AbortController | null>(null);
+  const subRef = useRef<NarrateSubscription | null>(null);
 
   useEffect(() => {
-    if (state.phase !== "loading") return;
+    if (analysis.phase !== "loading") return;
     const started = Date.now();
     const timer = setInterval(
       () => setElapsed(Math.floor((Date.now() - started) / 1000)),
       250,
     );
     return () => clearInterval(timer);
-  }, [state.phase]);
+  }, [analysis.phase]);
 
   useEffect(() => {
     if (!preview) return;
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  const handleSelect = async (file: File) => {
+  // Close the stream when the page unmounts
+  useEffect(() => () => subRef.current?.(), []);
+
+  const stopStory = () => {
+    subRef.current?.();
+    subRef.current = null;
+  };
+
+  const startStory = (sessionId: string, pickId: string) => {
+    stopStory();
+    setStory({ phase: "streaming", meta: null, text: "" });
+    subRef.current = narrate(sessionId, pickId, {
+      onMeta: (meta) => setStory({ phase: "streaming", meta, text: "" }),
+      onDelta: (chunk) =>
+        setStory((s) =>
+          s.phase === "streaming" ? { ...s, text: s.text + chunk } : s,
+        ),
+      onDone: (done) =>
+        setStory((s) =>
+          s.phase === "streaming"
+            ? { phase: "done", meta: s.meta, text: s.text, done }
+            : s,
+        ),
+      onError: (err) =>
+        setStory((s) =>
+          s.phase === "streaming"
+            ? {
+                phase: "error",
+                meta: s.meta,
+                text: s.text,
+                status: err.status,
+                detail: err.detail,
+              }
+            : s,
+        ),
+    });
+  };
+
+  const handleSelectPhoto = async (file: File) => {
     abortRef.current?.abort();
+    stopStory();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setPreview(URL.createObjectURL(file));
     setSelectedId(null);
+    setStory({ phase: "idle" });
     setElapsed(0);
-    setState({ phase: "loading" });
+    setAnalysis({ phase: "loading" });
     try {
-      setState({ phase: "done", result: await analyze(file, ctrl.signal) });
+      setAnalysis({ phase: "done", result: await analyze(file, ctrl.signal) });
     } catch (e) {
       if (ctrl.signal.aborted) return;
-      const message =
-        e instanceof ApiError
-          ? `${e.status}: ${e.message}`
-          : e instanceof Error
-            ? e.message
-            : String(e);
-      setState({ phase: "error", message });
+      setAnalysis({ phase: "error", message: errorMessage(e) });
     }
   };
 
-  const result = state.phase === "done" ? state.result : null;
+  const result = analysis.phase === "done" ? analysis.result : null;
+
+  // Tapping another candidate closes the current stream and starts a new one
+  const handlePick = (id: string) => {
+    if (!result) return;
+    setSelectedId(id);
+    startStory(result.session_id, id);
+  };
+
   const lineupItems = result
     ? result.lineup.flatMap((id) => result.objects.filter((o) => o.id === id))
     : [];
+  const hero = story.phase !== "idle" ? story.meta : null;
 
   return (
     <main className="mx-auto max-w-md space-y-4 px-4 py-6">
       <h1 className="text-xl font-bold">SanpoLab</h1>
       <PhotoInput
-        disabled={state.phase === "loading"}
-        onSelect={handleSelect}
+        disabled={analysis.phase === "loading"}
+        onSelect={handleSelectPhoto}
       />
 
-      {state.phase === "loading" && (
+      {analysis.phase === "loading" && (
         <p className="text-center text-gray-700" aria-live="polite">
           検出中… {elapsed}秒
         </p>
       )}
-      {state.phase === "error" && (
+      {analysis.phase === "error" && (
         <p
           className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
           role="alert"
         >
-          うまく読み取れませんでした（{state.message}）
+          うまく読み取れませんでした（{analysis.message}）
         </p>
+      )}
+
+      {preview && hero && (
+        <HeroCrop src={preview} box={hero.box} name={hero.name} />
       )}
 
       {preview &&
@@ -107,8 +183,43 @@ export default function Home() {
           <Lineup
             items={lineupItems}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={handlePick}
           />
+        </section>
+      )}
+
+      {story.phase !== "idle" && (
+        <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
+          <h2 className="font-bold">
+            {hero ? `この${hero.name}、実は…` : "語りを準備中…"}
+          </h2>
+          <Narration
+            text={story.text}
+            streaming={story.phase === "streaming"}
+          />
+          {story.phase === "done" && (
+            <>
+              <Takeaway text={story.done.takeaway} />
+              <Sources sources={story.done.sources} />
+            </>
+          )}
+          {story.phase === "error" && (
+            <div className="space-y-2" role="alert">
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                語りを取得できませんでした（{story.status || "通信"}:{" "}
+                {story.detail}）
+              </p>
+              {result && selectedId && (
+                <button
+                  type="button"
+                  onClick={() => startStory(result.session_id, selectedId)}
+                  className="rounded-lg bg-emerald-700 px-4 py-2 font-bold text-white active:bg-emerald-800"
+                >
+                  もう一度
+                </button>
+              )}
+            </div>
+          )}
         </section>
       )}
     </main>
