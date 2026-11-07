@@ -7,14 +7,16 @@ type Props = {
 export default function Sources({ sources }: Props) {
   if (sources.length === 0) {
     return (
-      <p className="text-sm text-gray-500">
-        出典なし（検索で裏取りできなかった話です）
+      <p className="text-sm text-gray-500" data-testid="sources">
+        一般的な知識から語っています。固有の由来や歴史は述べていません。
       </p>
     );
   }
   return (
-    <section>
-      <h3 className="mb-1 text-sm font-bold text-gray-700">出典</h3>
+    <section data-testid="sources">
+      <h3 className="mb-1 text-sm font-bold text-gray-700">
+        Google 検索で確認した出典
+      </h3>
       <ul className="space-y-1 text-sm">
         {sources.map((s) => (
           <li key={s.uri} className="truncate">

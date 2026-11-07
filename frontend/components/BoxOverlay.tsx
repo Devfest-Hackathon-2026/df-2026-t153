@@ -64,21 +64,24 @@ export default function BoxOverlay({
                   width={x2 - x1}
                   height={y2 - y1}
                   fill="none"
-                  stroke={hot ? "#dc2626" : "rgba(229,231,235,0.85)"}
+                  stroke={hot ? "#d9412b" : "rgba(255,255,255,0.55)"}
                   strokeWidth={hot ? (o.id === selectedId ? 6 : 2.5) : 1.5}
                   vectorEffect="non-scaling-stroke"
                 />
-                <text
-                  x={x1 + fontSize * 0.2}
-                  y={labelY}
-                  fontSize={fontSize}
-                  fill={hot ? "#dc2626" : "#f3f4f6"}
-                  stroke="rgba(0,0,0,0.6)"
-                  strokeWidth={fontSize * 0.12}
-                  paintOrder="stroke"
-                >
-                  {o.name}
-                </text>
+                {/* Labels only for candidates; the rest stay as faint frames to keep the photo readable */}
+                {hot && (
+                  <text
+                    x={x1 + fontSize * 0.2}
+                    y={labelY}
+                    fontSize={fontSize}
+                    fill="#d9412b"
+                    stroke="rgba(0,0,0,0.6)"
+                    strokeWidth={fontSize * 0.12}
+                    paintOrder="stroke"
+                  >
+                    {o.name}
+                  </text>
+                )}
               </g>
             );
           })}

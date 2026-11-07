@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* Brand tokens. Change here, not in components. */
+@theme {
+  --color-paper: #f7f5ef;
+  --color-card: #ffffff;
+  --color-ink: #1f2a24;
+  --color-ink-muted: #6b7570;
+  --color-line: #e6e2d8;
+  --color-moss: #3f6b4f;
+  --color-moss-deep: #2f5240;
+  --color-moss-soft: #e9f0ea;
+  --color-mark: #d9412b;
+  --color-mark-soft: #fbe9e6;
+  --shadow-card:
+    0 1px 2px rgb(31 42 36 / 0.06), 0 8px 24px -16px rgb(31 42 36 / 0.25);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-feature-settings: "palt";
+}
+
+/* Hide the scrollbar on chip rows; they still scroll by touch */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -32,7 +32,7 @@ export default function HeroCrop({ src, box, name }: Props) {
     : null;
 
   return (
-    <figure className="overflow-hidden rounded-lg bg-gray-100">
+    <figure className="relative overflow-hidden rounded-2xl bg-ink shadow-card">
       {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL; only used to learn the natural size */}
       <img
         src={src}
@@ -45,27 +45,32 @@ export default function HeroCrop({ src, box, name }: Props) {
           })
         }
       />
-      {view && (
+      {view && size && (
         <svg
           viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-          className="block max-h-72 w-full"
+          className="block max-h-80 w-full"
           role="img"
           aria-label={`${name} の拡大`}
         >
-          <image href={src} width={size!.w} height={size!.h} />
+          <image href={src} width={size.w} height={size.h} />
           <rect
-            x={(x1 / 1000) * size!.w}
-            y={(y1 / 1000) * size!.h}
-            width={((x2 - x1) / 1000) * size!.w}
-            height={((y2 - y1) / 1000) * size!.h}
+            x={(x1 / 1000) * size.w}
+            y={(y1 / 1000) * size.h}
+            width={((x2 - x1) / 1000) * size.w}
+            height={((y2 - y1) / 1000) * size.h}
             fill="none"
-            stroke="#dc2626"
+            stroke="#d9412b"
             strokeWidth={3}
             vectorEffect="non-scaling-stroke"
           />
         </svg>
       )}
-      <figcaption className="px-3 py-2 text-sm font-bold">{name}</figcaption>
+      <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pt-10 pb-3 text-white">
+        <span className="block text-xs tracking-wide opacity-80">
+          今日の主役
+        </span>
+        <span className="block text-lg font-bold">{name}</span>
+      </figcaption>
     </figure>
   );
 }

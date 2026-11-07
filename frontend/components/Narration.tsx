@@ -20,7 +20,7 @@ export default function Narration({ text, streaming }: Props) {
       <p className="whitespace-pre-wrap leading-relaxed">
         {text}
         {streaming && (
-          <span className="ml-0.5 inline-block w-2 animate-pulse bg-gray-400">
+          <span className="ml-0.5 inline-block w-2 animate-pulse bg-moss">
             &nbsp;
           </span>
         )}

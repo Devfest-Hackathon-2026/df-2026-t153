@@ -39,14 +39,18 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+const card = "rounded-2xl border border-line bg-card p-4 shadow-card";
+
 export default function Home() {
   const [analysis, setAnalysis] = useState<AnalyzeState>({ phase: "idle" });
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [story, setStory] = useState<NarrateState>({ phase: "idle" });
+  const [photoOpen, setPhotoOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const subRef = useRef<NarrateSubscription | null>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (analysis.phase !== "loading") return;
@@ -109,6 +113,7 @@ export default function Home() {
     setPreview(URL.createObjectURL(file));
     setSelectedId(null);
     setStory({ phase: "idle" });
+    setPhotoOpen(false);
     setElapsed(0);
     setAnalysis({ phase: "loading" });
     try {
@@ -121,76 +126,73 @@ export default function Home() {
 
   const result = analysis.phase === "done" ? analysis.result : null;
 
-  // Tapping another candidate closes the current stream and starts a new one
+  // Tapping a candidate (card or chip) closes the current stream and starts a new one
   const handlePick = (id: string) => {
     if (!result) return;
     setSelectedId(id);
     startStory(result.session_id, id);
   };
 
+  // Once a story starts, bring the hero crop to the top of the viewport
+  const storyView = story.phase !== "idle";
+  useEffect(() => {
+    if (storyView)
+      heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [storyView, selectedId]);
+
   const lineupItems = result
     ? result.lineup.flatMap((id) => result.objects.filter((o) => o.id === id))
     : [];
-  const hero = story.phase !== "idle" ? story.meta : null;
+  const hero = storyView ? story.meta : null;
+  const others = result
+    ? result.objects.filter((o) => !result.lineup.includes(o.id))
+    : [];
 
-  return (
-    <main className="mx-auto max-w-md space-y-4 px-4 py-6">
-      <h1 className="text-xl font-bold">SanpoLab</h1>
-      <PhotoInput
-        disabled={analysis.phase === "loading"}
-        onSelect={handleSelectPhoto}
-      />
-
-      {analysis.phase === "loading" && (
-        <p className="text-center text-gray-700" aria-live="polite">
-          検出中… {elapsed}秒
+  const header = (
+    <header className="flex items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">SanpoLab</h1>
+        <p className="text-sm text-ink-muted">
+          見慣れた物の「実は…」を、散歩の写真から
         </p>
-      )}
-      {analysis.phase === "error" && (
-        <p
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
-          role="alert"
-        >
-          うまく読み取れませんでした（{analysis.message}）
-        </p>
-      )}
-
-      {preview && hero && (
-        <HeroCrop src={preview} box={hero.box} name={hero.name} />
-      )}
-
-      {preview &&
-        (result ? (
-          <BoxOverlay
-            src={preview}
-            objects={result.objects}
-            lineup={result.lineup}
-            selectedId={selectedId}
-          />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
-          <img
-            src={preview}
-            alt="送った写真"
-            className="block h-auto w-full rounded-lg opacity-60"
-          />
-        ))}
-
+      </div>
       {result && (
-        <section className="space-y-2">
-          <p className="text-sm text-gray-600">{result.scene}</p>
-          <h2 className="font-bold">今日の主役の候補</h2>
-          <Lineup
-            items={lineupItems}
-            selectedId={selectedId}
-            onSelect={handlePick}
-          />
-        </section>
+        <PhotoInput
+          compact
+          disabled={analysis.phase === "loading"}
+          onSelect={handleSelectPhoto}
+        />
       )}
+    </header>
+  );
 
-      {story.phase !== "idle" && (
-        <section className="space-y-3 rounded-lg border border-gray-200 bg-white p-3">
-          <h2 className="font-bold">
+  const originalPhoto = preview && result && (
+    <BoxOverlay
+      src={preview}
+      objects={result.objects}
+      lineup={result.lineup}
+      selectedId={selectedId}
+    />
+  );
+
+  // ---- Story view: hero -> narration -> takeaway -> chips -> collapsed photo ----
+  if (storyView && result && preview) {
+    return (
+      <main className="mx-auto max-w-md space-y-4 px-4 py-6">
+        {header}
+        <div ref={heroRef} className="scroll-mt-4" data-section="hero">
+          {hero ? (
+            <HeroCrop src={preview} box={hero.box} name={hero.name} />
+          ) : (
+            <div
+              className="h-48 animate-pulse rounded-2xl bg-line"
+              aria-hidden
+            />
+          )}
+        </div>
+
+        <section className={`${card} space-y-4`} data-section="story">
+          <h2 className="text-lg font-bold">
             {hero ? `この${hero.name}、実は…` : "語りを準備中…"}
           </h2>
           <Narration
@@ -199,27 +201,134 @@ export default function Home() {
           />
           {story.phase === "done" && (
             <>
-              <Takeaway text={story.done.takeaway} />
+              <div data-section="takeaway">
+                <Takeaway text={story.done.takeaway} />
+              </div>
               <Sources sources={story.done.sources} />
             </>
           )}
           {story.phase === "error" && (
             <div className="space-y-2" role="alert">
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p className="rounded-xl bg-mark-soft px-3 py-2 text-sm text-mark">
                 語りを取得できませんでした（{story.status || "通信"}:{" "}
                 {story.detail}）
               </p>
-              {result && selectedId && (
+              {selectedId && (
                 <button
                   type="button"
                   onClick={() => startStory(result.session_id, selectedId)}
-                  className="rounded-lg bg-emerald-700 px-4 py-2 font-bold text-white active:bg-emerald-800"
+                  className="rounded-full bg-moss px-5 py-2 font-bold text-white active:bg-moss-deep"
                 >
                   もう一度
                 </button>
               )}
             </div>
           )}
+        </section>
+
+        <section className="space-y-2" data-section="lineup">
+          <h2 className="text-xs font-bold tracking-wide text-ink-muted">
+            ほかの主役候補（タップで語り直し）
+          </h2>
+          <Lineup
+            variant="chips"
+            items={lineupItems}
+            selectedId={selectedId}
+            onSelect={handlePick}
+          />
+        </section>
+
+        <section className={`${card} p-0`} data-section="photo">
+          <button
+            type="button"
+            aria-expanded={photoOpen}
+            onClick={() => setPhotoOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold"
+          >
+            元の写真と見つけた物
+            <span aria-hidden className="text-ink-muted">
+              {photoOpen ? "▲" : "▼"}
+            </span>
+          </button>
+          {photoOpen && (
+            <div className="space-y-3 px-4 pb-4">
+              {originalPhoto}
+              <p className="text-sm text-ink-muted">{result.scene}</p>
+              {others.length > 0 && (
+                <ul
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="候補に入らなかった物"
+                >
+                  {others.map((o) => (
+                    <li
+                      key={o.id}
+                      className="rounded-full bg-paper px-2.5 py-0.5 text-xs text-ink-muted"
+                    >
+                      {o.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  // ---- Pick view: input -> photo with boxes -> candidate cards ----
+  return (
+    <main className="mx-auto max-w-md space-y-4 px-4 py-6">
+      {header}
+      {!result && (
+        <PhotoInput
+          disabled={analysis.phase === "loading"}
+          onSelect={handleSelectPhoto}
+        />
+      )}
+
+      {analysis.phase === "loading" && (
+        <p className="text-center text-ink-muted" aria-live="polite">
+          検出中… {elapsed}秒
+        </p>
+      )}
+      {analysis.phase === "error" && (
+        <p
+          className="rounded-xl bg-mark-soft px-3 py-2 text-sm text-mark"
+          role="alert"
+        >
+          うまく読み取れませんでした（{analysis.message}）
+        </p>
+      )}
+
+      {preview && (
+        <div
+          className="overflow-hidden rounded-2xl shadow-card"
+          data-section="photo"
+        >
+          {originalPhoto ?? (
+            // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
+            <img
+              src={preview}
+              alt="送った写真"
+              className="block h-auto w-full opacity-60"
+            />
+          )}
+        </div>
+      )}
+
+      {result && (
+        <section className="space-y-2" data-section="lineup">
+          <p className="text-sm text-ink-muted">{result.scene}</p>
+          <h2 className="text-lg font-bold">今日の主役の候補</h2>
+          <p className="text-xs text-ink-muted">
+            タップすると、その物の「実は…」が始まります
+          </p>
+          <Lineup
+            items={lineupItems}
+            selectedId={selectedId}
+            onSelect={handlePick}
+          />
         </section>
       )}
     </main>
