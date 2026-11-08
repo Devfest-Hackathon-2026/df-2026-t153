@@ -2,8 +2,31 @@
 
 散歩中に撮った写真から「今日の主役」を1つ抽選し、「この◯◯、実は…」と身近な物の裏面を語る Web アプリ。
 
-- デプロイ URL：
+- デプロイ URL：https://sanpolab.web.app（frontend）／ backend は「デプロイ」の表を参照
 - DevFest GDGoC Japan Hackathon 2026 / カテゴリ：観光
+
+## デプロイ
+
+| 役割 | 先 | URL |
+|---|---|---|
+| frontend | Firebase Hosting（プロジェクト `sanpolab`） | https://sanpolab.web.app |
+| backend | Cloud Run `sanpolab-api`（asia-northeast1） | https://sanpolab-api-987498575224.asia-northeast1.run.app |
+
+### frontend（静的エクスポート → Firebase Hosting）
+
+```sh
+# リポジトリルートで。引数は backend（Cloud Run）の URL。末尾スラッシュなし
+sh scripts/deploy-frontend.sh https://sanpolab-api-987498575224.asia-northeast1.run.app
+```
+
+- `NEXT_PUBLIC_API_BASE` はビルド時に埋め込まれるので、**backend の URL が変わったら必ずビルドし直す**。差し替える箇所は上の表と、このコマンドの引数の 2 か所
+- `firebase deploy` の認証は `gcloud auth application-default login` の ADC を使う（`firebase login` でもよい）
+- 設定は `firebase.json`（公開ディレクトリ `frontend/out`、cleanUrls、キャッシュヘッダ。SPA rewrite は無し）と `.firebaserc`
+
+### backend 側で必要な設定（Cloud Run）
+
+- `ALLOWED_ORIGINS` に Hosting のオリジンを入れる：`https://sanpolab.web.app,https://sanpolab.firebaseapp.com`（ローカル開発を残すなら `http://localhost:3000` も）
+- 未認証で呼べるようにする（`roles/run.invoker` を `allUsers` に）。これが無いとブラウザからは 403 になる
 
 ## 構成
 

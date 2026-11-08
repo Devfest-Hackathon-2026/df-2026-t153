@@ -158,3 +158,10 @@
 - 理由：
 - 捨てた理由：(a) 端末ごとに見た目が変わり、Windows ではデモ録画の字面が崩れる (c) 可読性と太字のバリエーションで Noto Sans JP に劣るか、好みの域を出ない
 - 見直し条件：
+
+## D-19 PWA の構成（2026-11-08 / ）
+- 候補：(a) manifest（`app/manifest.ts`）＋アイコン＋`appleWebApp` メタだけ。ホーム画面に追加でき、standalone で開く。Service Worker なし (b) (a) に加えて Service Worker でシェルをキャッシュ（Serwist / next-pwa 等） (c) PWA 化しない
+- 選択：(a)。アイコンは自作 SVG（丸地に「散」、moss 色）をヘッドレスブラウザで 192 / 512 / maskable 512 / apple-touch 180 の PNG に書き出して `public/icons/` に置く。favicon は `app/icon.svg`
+- 理由：
+- 捨てた理由：(b) 写真の解析も語りも通信が必須でオフラインの価値が薄く、Service Worker のキャッシュ更新の不具合は凍結前日に切り分ける余裕がない。ライブラリ追加も要る (c) アドレスバーが残ったままでは「アプリ感」が出ず、J1 の実機確認の前提も満たせない
+- 見直し条件：

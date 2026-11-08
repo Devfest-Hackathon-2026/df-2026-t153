@@ -43,3 +43,4 @@
 | 名前 | 用途 | 出典 | ライセンス | 確認 |
 |---|---|---|---|---|
 | Noto Sans JP | 本文フォント（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Sans+JP | SIL Open Font License 1.1 | 未確認 |
+| アプリアイコン「散」 | PWA / favicon（`frontend/public/icons/`, `app/icon.svg`） | 自作（このリポジトリ） | リポジトリと同じ | 確認済 |

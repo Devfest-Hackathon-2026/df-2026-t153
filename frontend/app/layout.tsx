@@ -12,6 +12,10 @@ const notoSansJP = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: "SanpoLab",
   description: "散歩の写真から、今日の主役の裏面を語る",
+  applicationName: "SanpoLab",
+  // Home-screen install on iOS (which ignores the manifest's display/icons)
+  appleWebApp: { capable: true, title: "SanpoLab", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
