@@ -2,7 +2,13 @@ import { apiBase } from "./env";
 
 // The SSE route has no response_model, so these shapes are not in api.gen.ts.
 // They mirror docs/api.md "/api/narrate の中身"; keep them in sync by hand.
-export type NarrateMeta = { pick_id: string; name: string; box: number[] };
+export type NarrateMeta = {
+  pick_id: string;
+  name: string;
+  box: number[];
+  /** Place name resolved from the photo's location; absent until the server sends it */
+  place?: string | null;
+};
 export type NarrateSource = { title: string; uri: string };
 export type NarrateDone = {
   takeaway: string;

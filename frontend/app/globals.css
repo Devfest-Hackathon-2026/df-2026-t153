@@ -5,6 +5,8 @@
   --font-sans:
     var(--font-noto-sans-jp), ui-sans-serif, system-ui, "Hiragino Sans",
     "Yu Gothic", sans-serif;
+  --font-serif:
+    var(--font-noto-serif-jp), "Hiragino Mincho ProN", "Yu Mincho", serif;
   --color-paper: #f7f5ef;
   --color-card: #ffffff;
   --color-ink: #1f2a24;
@@ -128,23 +130,10 @@ label {
   }
 }
 
-/* One bright flash on the tapped box, then the story view takes over */
-.flash {
-  animation: flash 0.2s ease-out both;
-}
-@keyframes flash {
-  from {
-    opacity: 0.75;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
 /* Slow zoom on the hero crop while the first words arrive */
 .kenburns {
-  transform-box: fill-box;
-  transform-origin: center;
+  /* origin is set inline in viewBox units (the crop's center) */
+  transform-box: view-box;
   animation: kenburns 1.5s ease-out both;
 }
 @keyframes kenburns {
@@ -185,8 +174,7 @@ label {
   .decor {
     display: none !important;
   }
-  .kenburns,
-  .flash {
+  .kenburns {
     animation: none !important;
   }
 }

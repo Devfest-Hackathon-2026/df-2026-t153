@@ -23,13 +23,13 @@ import {
   type FriendlyError,
 } from "@/lib/errors";
 import { pickHint } from "@/lib/hints";
-import { saveTakeaway } from "@/lib/takeaways";
 import {
   narrate,
   type NarrateDone,
   type NarrateMeta,
   type NarrateSubscription,
 } from "@/lib/narrate";
+import { saveTakeaway } from "@/lib/takeaways";
 
 type AnalyzeState =
   | { phase: "idle" }
@@ -49,16 +49,14 @@ type NarrateState =
       detail: string;
     };
 
-const card = "rounded-2xl border border-line bg-card p-4 shadow-card";
-
 // Stage 1 -> 2 switch while waiting for analyze (seconds). Matches the real order
 // of work on the server: read the image, then list what is in it, then pick.
 const COUNTING_AFTER_S = 3;
 // Honest wait messages once the usual 10-20s has clearly passed
 const SLOW_AFTER_S = 25;
 const STUCK_AFTER_S = 60;
-// The tapped box lights up for this long before the story view replaces the photo
-const FLASH_MS = 200;
+// No narration text for this long -> offer a retry while the stream stays open
+const STALL_AFTER_MS = 30_000;
 const STAGE_MESSAGES = {
   1: "写真を読んでいます",
   2: "写っている物を数えています",
@@ -73,23 +71,24 @@ function stageMessage(stage: 1 | 2 | 3, elapsed: number): string {
   return STAGE_MESSAGES[2];
 }
 
+const rule = "border-t border-line";
+
 export default function Home() {
   const [analysis, setAnalysis] = useState<AnalyzeState>({ phase: "idle" });
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [story, setStory] = useState<NarrateState>({ phase: "idle" });
+  const [stalled, setStalled] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
-  const [flashId, setFlashId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const subRef = useRef<NarrateSubscription | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
   // Kept for "もう一度" after a failed analyze
   const lastFileRef = useRef<File | null>(null);
   const metaRef = useRef<NarrateMeta | null>(null);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (analysis.phase !== "loading") return;
@@ -101,33 +100,13 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [analysis.phase]);
 
-  // Hold the candidates back until the boxes have finished locking on
-  useEffect(() => {
-    if (!revealing || analysis.phase !== "done") return;
-    // With reduced motion the boxes appear at once, so there is nothing to wait for
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    const timer = setTimeout(
-      () => setRevealing(false),
-      reduced ? 0 : revealDuration(analysis.result.objects.length),
-    );
-    return () => clearTimeout(timer);
-  }, [revealing, analysis]);
-
   useEffect(() => {
     if (!preview) return;
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  // Close the stream and pending timers when the page unmounts
-  useEffect(
-    () => () => {
-      subRef.current?.();
-      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    },
-    [],
-  );
+  // Close the stream when the page unmounts
+  useEffect(() => () => subRef.current?.(), []);
 
   const stopStory = () => {
     subRef.current?.();
@@ -136,6 +115,8 @@ export default function Home() {
 
   const startStory = (sessionId: string, pickId: string) => {
     stopStory();
+    setSelectedId(pickId);
+    setStalled(false);
     setStory({ phase: "streaming", meta: null, text: "" });
     metaRef.current = null;
     subRef.current = narrate(sessionId, pickId, {
@@ -172,6 +153,39 @@ export default function Home() {
         ),
     });
   };
+  // Latest startStory for timers that outlive a render (the autopick below)
+  const startStoryRef = useRef(startStory);
+  useEffect(() => {
+    startStoryRef.current = startStory;
+  });
+
+  // The app picks today's hero (D-28): once the boxes have locked on, narrate lineup[0]
+  useEffect(() => {
+    if (!revealing || analysis.phase !== "done") return;
+    const { result } = analysis;
+    // With reduced motion the boxes appear at once, so there is nothing to wait for
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const timer = setTimeout(
+      () => {
+        setRevealing(false);
+        if (result.lineup[0])
+          startStoryRef.current(result.session_id, result.lineup[0]);
+      },
+      reduced ? 0 : revealDuration(result.objects.length),
+    );
+    return () => clearTimeout(timer);
+  }, [revealing, analysis]);
+
+  // Stall watchdog: the stream is kept open, the reader just gets a way out
+  const streaming = story.phase === "streaming";
+  const textLength = story.phase === "idle" ? 0 : story.text.length;
+  useEffect(() => {
+    if (!streaming) return;
+    const timer = setTimeout(() => setStalled(true), STALL_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [streaming, textLength]);
 
   const handleSelectPhoto = async (file: File) => {
     lastFileRef.current = file;
@@ -182,6 +196,7 @@ export default function Home() {
     setPreview(URL.createObjectURL(file));
     setSelectedId(null);
     setStory({ phase: "idle" });
+    setStalled(false);
     setPhotoOpen(false);
     setHint((h) => pickHint(h));
     setElapsed(0);
@@ -208,23 +223,6 @@ export default function Home() {
   };
 
   const result = analysis.phase === "done" ? analysis.result : null;
-
-  // Tapping a candidate (card or chip) closes the current stream and starts a new one.
-  // From the pick view the box flashes first so the tap visibly lands on the photo.
-  const handlePick = (id: string) => {
-    if (!result) return;
-    setSelectedId(id);
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    if (story.phase !== "idle") {
-      startStory(result.session_id, id);
-      return;
-    }
-    setFlashId(id);
-    flashTimerRef.current = setTimeout(() => {
-      setFlashId(null);
-      startStory(result.session_id, id);
-    }, FLASH_MS);
-  };
 
   // Once a story starts, bring the hero crop to the top of the viewport
   const storyView = story.phase !== "idle";
@@ -253,10 +251,13 @@ export default function Home() {
   const header = (
     <header className="flex items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">SanpoLab</h1>
-        <p className="text-sm text-ink-muted">
-          見慣れた物の「実は…」を、散歩の写真から
-        </p>
+        <h1 className="text-xl font-bold tracking-tight">SanpoLab</h1>
+        {/* The tagline only introduces; once a photo is in, the photo speaks */}
+        {!preview && (
+          <p className="mt-1 text-sm text-ink-muted">
+            見慣れた物の「実は…」を、散歩の写真から
+          </p>
+        )}
       </div>
       {preview && (
         <PhotoInput
@@ -268,43 +269,46 @@ export default function Home() {
     </header>
   );
 
-  const originalPhoto = preview && result && (
-    <BoxOverlay
-      src={preview}
-      objects={result.objects}
-      lineup={result.lineup}
-      selectedId={selectedId}
-    />
-  );
-
-  // ---- Story view: hero -> narration -> takeaway -> chips -> collapsed photo ----
+  // ---- Story view: hero -> narration -> takeaway -> sources -> chips -> collapsed photo ----
   if (storyView && result && preview) {
     return (
-      <main className="mx-auto max-w-md space-y-4 px-4 py-6">
+      <main className="mx-auto max-w-md px-4 py-5">
         {header}
-        <div ref={heroRef} className="scroll-mt-4" data-section="hero">
+        <div ref={heroRef} className="mt-4 scroll-mt-2" data-section="hero">
           {hero ? (
-            <HeroCrop src={preview} box={hero.box} name={hero.name} />
-          ) : (
-            <div
-              className="h-48 animate-pulse rounded-2xl bg-line"
-              aria-hidden
+            <HeroCrop
+              src={preview}
+              box={hero.box}
+              name={hero.name}
+              place={hero.place}
             />
+          ) : (
+            <div className="-mx-4 h-48 animate-pulse bg-line" aria-hidden />
           )}
         </div>
 
-        <section className={`${card} space-y-4`} data-section="story">
-          <h2 className="text-lg font-bold">
-            {hero ? `この${hero.name}、実は…` : "語りを準備中…"}
-          </h2>
-          <Narration
-            text={story.text}
-            streaming={story.phase === "streaming"}
-          />
+        {/* No heading: the voice starts right under the photo */}
+        <section className="mt-6 space-y-5" data-section="story">
+          <Narration text={story.text} streaming={streaming} />
+          {streaming && stalled && selectedId && (
+            <div
+              className="enter flex items-center gap-3 text-sm text-ink-muted"
+              data-testid="stalled"
+            >
+              時間がかかっています
+              <button
+                type="button"
+                onClick={() => startStory(result.session_id, selectedId)}
+                className="rounded-full border border-ink/60 px-4 py-1 text-ink active:bg-ink/5"
+              >
+                もう一度
+              </button>
+            </div>
+          )}
           {story.phase === "done" && (
             <>
               <div
-                className="enter"
+                className="enter pt-1"
                 style={{ transitionDelay: "300ms" }}
                 data-section="takeaway"
               >
@@ -328,24 +332,25 @@ export default function Home() {
           )}
         </section>
 
-        <section className="space-y-2" data-section="lineup">
-          <h2 className="text-xs font-bold tracking-wide text-ink-muted">
-            ほかの主役候補（タップで語り直し）
-          </h2>
-          <Lineup
-            variant="chips"
-            items={lineupItems}
-            selectedId={selectedId}
-            onSelect={handlePick}
-          />
-        </section>
+        {lineupItems.length > 1 && (
+          <section className={`${rule} mt-6 pt-4`} data-section="lineup">
+            <Lineup
+              items={lineupItems}
+              selectedId={selectedId}
+              onSelect={(id) => startStory(result.session_id, id)}
+            />
+          </section>
+        )}
 
-        <section className={`${card} p-0`} data-section="photo">
+        <section
+          className="mt-6 rounded-2xl border border-line bg-card shadow-card"
+          data-section="photo"
+        >
           <button
             type="button"
             aria-expanded={photoOpen}
             onClick={() => setPhotoOpen((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold"
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm"
           >
             元の写真と見つけた物
             <span aria-hidden className="text-ink-muted">
@@ -354,18 +359,20 @@ export default function Home() {
           </button>
           {photoOpen && (
             <div className="space-y-3 px-4 pb-4">
-              {originalPhoto}
+              <BoxOverlay
+                src={preview}
+                objects={result.objects}
+                lineup={result.lineup}
+                selectedId={selectedId}
+              />
               <p className="text-sm text-ink-muted">{result.scene}</p>
               {others.length > 0 && (
                 <ul
-                  className="flex flex-wrap gap-1.5"
+                  className="flex flex-wrap gap-x-3 gap-y-1"
                   aria-label="候補に入らなかった物"
                 >
                   {others.map((o) => (
-                    <li
-                      key={o.id}
-                      className="rounded-full bg-paper px-2.5 py-0.5 text-xs text-ink-muted"
-                    >
+                    <li key={o.id} className="text-xs text-ink-muted">
                       {o.name}
                     </li>
                   ))}
@@ -378,87 +385,85 @@ export default function Home() {
     );
   }
 
-  // ---- Pick view: input -> photo with boxes -> candidate cards ----
+  // ---- Intake view: picker, then the photo while it is read and the boxes lock on ----
   return (
-    <main className="mx-auto max-w-md space-y-4 px-4 py-6">
+    <main className="mx-auto max-w-md px-4 py-5">
       {header}
-      {!preview && <PhotoInput onSelect={handleSelectPhoto} />}
-      {!preview && <TakeawayHistory />}
+      {!preview && (
+        <div className="mt-8 space-y-8">
+          <PhotoInput onSelect={handleSelectPhoto} />
+          <TakeawayHistory />
+        </div>
+      )}
 
       {stage && (
         <p
-          className="flex items-center justify-center gap-2 text-sm text-ink-muted"
+          className="mt-5 flex items-center justify-center gap-2 text-sm text-ink-muted"
           aria-live="polite"
           data-stage={stage}
         >
           <span
-            className="breathe inline-block h-2 w-2 rounded-full bg-moss"
+            className="breathe inline-block h-1.5 w-1.5 rounded-full bg-ink"
             aria-hidden
           />
           {stageMessage(stage, elapsed)}
         </p>
       )}
       {waiting && elapsed >= STUCK_AFTER_S && (
-        <div className="enter text-center">
+        <div className="enter mt-3 text-center">
           <button
             type="button"
             onClick={handleCancel}
-            className="rounded-full border border-line bg-card px-5 py-2 text-sm font-bold text-ink active:bg-mark-soft"
+            className="rounded-full border border-ink/60 px-5 py-1.5 text-sm text-ink active:bg-ink/5"
           >
             中断する
           </button>
         </div>
       )}
       {analysis.phase === "error" && (
-        <ErrorNotice
-          error={analysis.error}
-          onRetry={handleRetryAnalyze}
-          retryLabel="同じ写真でもう一度"
-        />
+        <div className="mt-5">
+          <ErrorNotice
+            error={analysis.error}
+            onRetry={handleRetryAnalyze}
+            retryLabel="同じ写真でもう一度"
+          />
+        </div>
       )}
 
       {preview && (
-        <div
-          className="relative mx-auto w-fit overflow-hidden rounded-2xl shadow-card"
-          data-section="photo"
-        >
-          {result ? (
-            <BoxOverlay
-              key={result.session_id}
-              src={preview}
-              objects={result.objects}
-              lineup={result.lineup}
-              selectedId={selectedId}
-              reveal
-              flashId={flashId}
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
-            <img src={preview} alt="送った写真" className={PHOTO_CLASS} />
-          )}
-          {(stage === 1 || stage === 2) && <ScanOverlay stage={stage} />}
+        // Edge to edge on a dark field, like a viewfinder; the photo keeps its own aspect
+        <div className="relative -mx-4 mt-4 bg-ink" data-section="photo">
+          <div className="relative mx-auto w-fit">
+            {result ? (
+              <BoxOverlay
+                key={result.session_id}
+                src={preview}
+                objects={result.objects}
+                lineup={result.lineup}
+                selectedId={selectedId}
+                reveal
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
+              <img src={preview} alt="送った写真" className={PHOTO_CLASS} />
+            )}
+            {(stage === 1 || stage === 2) && <ScanOverlay stage={stage} />}
+          </div>
         </div>
+      )}
+
+      {result && !revealing && result.lineup.length === 0 && (
+        <section className="mt-5" data-section="lineup">
+          <Lineup items={[]} selectedId={null} onSelect={() => {}} />
+        </section>
       )}
 
       {hint &&
         (waiting || revealing || (result && result.lineup.length === 0)) && (
-          <HintCard text={hint} />
+          <div className="mt-6">
+            <HintCard text={hint} />
+          </div>
         )}
-
-      {result && !revealing && (
-        <section className="enter space-y-2" data-section="lineup">
-          <p className="text-sm text-ink-muted">{result.scene}</p>
-          <h2 className="text-lg font-bold">今日の主役の候補</h2>
-          <p className="text-xs text-ink-muted">
-            タップすると、その物の「実は…」が始まります
-          </p>
-          <Lineup
-            items={lineupItems}
-            selectedId={selectedId}
-            onSelect={handlePick}
-          />
-        </section>
-      )}
     </main>
   );
 }

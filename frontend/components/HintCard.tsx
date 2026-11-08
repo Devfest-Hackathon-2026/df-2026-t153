@@ -1,15 +1,15 @@
+import { VOICE_CLASS } from "./Narration";
+
 type Props = { text: string };
 
+// A piece of trivia set like a margin note: no box, no heading, just a dash
 export default function HintCard({ text }: Props) {
   return (
-    <aside
-      className="enter rounded-2xl border border-line bg-card p-4 shadow-card"
-      data-section="hint"
-    >
-      <p className="text-xs font-bold tracking-wide text-moss">
-        待っている間に、ひとつ雑学を
+    <aside className="enter" data-section="hint">
+      <p className={`${VOICE_CLASS} text-ink-muted`}>
+        <span aria-hidden>— </span>
+        {text}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{text}</p>
     </aside>
   );
 }

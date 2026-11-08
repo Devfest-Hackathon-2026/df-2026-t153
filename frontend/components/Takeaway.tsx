@@ -1,14 +1,17 @@
+import { VOICE_CLASS } from "./Narration";
+
 type Props = {
   text: string;
 };
 
+// The one place moss survives: a single rule marking what to carry to the next walk
 export default function Takeaway({ text }: Props) {
   return (
-    <aside className="rounded-xl border-l-4 border-moss bg-moss-soft px-4 py-3">
-      <h3 className="text-xs font-bold tracking-wide text-moss-deep">
+    <aside className="border-l-2 border-moss pl-4">
+      <h3 className="text-xs font-bold tracking-wide text-ink-muted">
         持ち帰る視点
       </h3>
-      <p className="mt-1 leading-relaxed text-ink">{text}</p>
+      <p className={`${VOICE_CLASS} mt-1`}>{text}</p>
     </aside>
   );
 }

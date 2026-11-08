@@ -13,7 +13,7 @@ export default function ErrorNotice({
 }: Props) {
   return (
     <div
-      className="enter space-y-2 rounded-2xl border border-mark/30 bg-mark-soft px-4 py-3"
+      className="enter space-y-2 border-l-2 border-mark pl-4"
       role="alert"
       data-testid="error"
     >
@@ -23,7 +23,7 @@ export default function ErrorNotice({
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-full bg-moss px-5 py-1.5 text-sm font-bold text-white active:bg-moss-deep"
+          className="rounded-full border border-ink/60 px-4 py-1 text-sm text-ink active:bg-ink/5"
         >
           {retryLabel}
         </button>

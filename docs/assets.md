@@ -43,4 +43,5 @@
 | 名前 | 用途 | 出典 | ライセンス | 確認 |
 |---|---|---|---|---|
 | Noto Sans JP | 本文フォント（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Sans+JP | SIL Open Font License 1.1 | 確認済（2026-11-08、https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE）|
+| Noto Serif JP | 語り・雑学・持ち帰る視点の本文（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Serif+JP | SIL Open Font License 1.1 | 確認済（2026-11-08、https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE）|
 | アプリアイコン「散」 | PWA / favicon（`frontend/public/icons/`, `app/icon.svg`） | 自作（このリポジトリ） | リポジトリと同じ | 確認済 |

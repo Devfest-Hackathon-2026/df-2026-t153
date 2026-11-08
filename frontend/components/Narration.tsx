@@ -7,6 +7,10 @@ type Props = {
   streaming: boolean;
 };
 
+// The narration is the only thing on the page set in serif: it is someone talking,
+// not the interface reporting.
+export const VOICE_CLASS = "font-serif text-[18px] leading-[1.9] text-ink";
+
 export default function Narration({ text, streaming }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -16,11 +20,11 @@ export default function Narration({ text, streaming }: Props) {
   }, [text, streaming]);
 
   return (
-    <div className="space-y-2" aria-live="polite">
-      <p className="whitespace-pre-wrap leading-relaxed">
+    <div aria-live="polite">
+      <p className={`${VOICE_CLASS} whitespace-pre-wrap`}>
         {text}
         {streaming && (
-          <span className="ml-0.5 inline-block w-2 animate-pulse bg-moss">
+          <span className="ml-0.5 inline-block w-2 animate-pulse bg-ink/70">
             &nbsp;
           </span>
         )}
