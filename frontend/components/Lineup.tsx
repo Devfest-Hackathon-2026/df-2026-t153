@@ -18,8 +18,8 @@ export default function Lineup({
 }: Props) {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-ink-muted">
-        今回は主役の候補が見つかりませんでした。別の写真を試してみてください。
+      <p className="text-sm text-ink-muted" data-testid="no-lineup">
+        この写真では主役が見つかりませんでした。壁や道路のような大きな面より、手で触れる大きさの物が写っていると見つかりやすくなります。
       </p>
     );
   }

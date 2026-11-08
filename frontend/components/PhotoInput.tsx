@@ -17,10 +17,10 @@ export default function PhotoInput({ disabled, compact, onSelect }: Props) {
   };
 
   const input = (
+    // No `capture`: with it, iOS Safari opens the camera only and hides the photo library
     <input
       type="file"
       accept="image/*"
-      capture="environment"
       className="sr-only"
       disabled={disabled}
       onChange={handleChange}

@@ -52,7 +52,12 @@ export default function HeroCrop({ src, box, name }: Props) {
           role="img"
           aria-label={`${name} の拡大`}
         >
-          <image href={src} width={size.w} height={size.h} />
+          <image
+            className="kenburns"
+            href={src}
+            width={size.w}
+            height={size.h}
+          />
           <rect
             x={(x1 / 1000) * size.w}
             y={(y1 / 1000) * size.h}

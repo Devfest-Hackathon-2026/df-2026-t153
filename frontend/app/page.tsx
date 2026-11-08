@@ -5,6 +5,7 @@ import BoxOverlay, {
   PHOTO_CLASS,
   revealDuration,
 } from "@/components/BoxOverlay";
+import ErrorNotice from "@/components/ErrorNotice";
 import HeroCrop from "@/components/HeroCrop";
 import HintCard from "@/components/HintCard";
 import Lineup from "@/components/Lineup";
@@ -13,8 +14,15 @@ import PhotoInput from "@/components/PhotoInput";
 import ScanOverlay from "@/components/ScanOverlay";
 import Sources from "@/components/Sources";
 import Takeaway from "@/components/Takeaway";
-import { analyze, ApiError, type AnalyzeResponse } from "@/lib/api";
+import TakeawayHistory from "@/components/TakeawayHistory";
+import { analyze, type AnalyzeResponse } from "@/lib/api";
+import {
+  describeError,
+  describeStatus,
+  type FriendlyError,
+} from "@/lib/errors";
 import { pickHint } from "@/lib/hints";
+import { saveTakeaway } from "@/lib/takeaways";
 import {
   narrate,
   type NarrateDone,
@@ -26,7 +34,7 @@ type AnalyzeState =
   | { phase: "idle" }
   | { phase: "loading" }
   | { phase: "done"; result: AnalyzeResponse }
-  | { phase: "error"; message: string };
+  | { phase: "error"; error: FriendlyError };
 
 type NarrateState =
   | { phase: "idle" }
@@ -40,11 +48,6 @@ type NarrateState =
       detail: string;
     };
 
-function errorMessage(e: unknown): string {
-  if (e instanceof ApiError) return `${e.status}: ${e.message}`;
-  return e instanceof Error ? e.message : String(e);
-}
-
 const card = "rounded-2xl border border-line bg-card p-4 shadow-card";
 
 // Stage 1 -> 2 switch while waiting for analyze (seconds). Matches the real order
@@ -53,6 +56,8 @@ const COUNTING_AFTER_S = 3;
 // Honest wait messages once the usual 10-20s has clearly passed
 const SLOW_AFTER_S = 25;
 const STUCK_AFTER_S = 60;
+// The tapped box lights up for this long before the story view replaces the photo
+const FLASH_MS = 200;
 const STAGE_MESSAGES = {
   1: "写真を読んでいます",
   2: "写っている物を数えています",
@@ -76,9 +81,14 @@ export default function Home() {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const subRef = useRef<NarrateSubscription | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
+  // Kept for "もう一度" after a failed analyze
+  const lastFileRef = useRef<File | null>(null);
+  const metaRef = useRef<NarrateMeta | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (analysis.phase !== "loading") return;
@@ -109,8 +119,14 @@ export default function Home() {
     return () => URL.revokeObjectURL(preview);
   }, [preview]);
 
-  // Close the stream when the page unmounts
-  useEffect(() => () => subRef.current?.(), []);
+  // Close the stream and pending timers when the page unmounts
+  useEffect(
+    () => () => {
+      subRef.current?.();
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   const stopStory = () => {
     subRef.current?.();
@@ -120,18 +136,27 @@ export default function Home() {
   const startStory = (sessionId: string, pickId: string) => {
     stopStory();
     setStory({ phase: "streaming", meta: null, text: "" });
+    metaRef.current = null;
     subRef.current = narrate(sessionId, pickId, {
-      onMeta: (meta) => setStory({ phase: "streaming", meta, text: "" }),
+      onMeta: (meta) => {
+        metaRef.current = meta;
+        setStory({ phase: "streaming", meta, text: "" });
+      },
       onDelta: (chunk) =>
         setStory((s) =>
           s.phase === "streaming" ? { ...s, text: s.text + chunk } : s,
         ),
-      onDone: (done) =>
+      onDone: (done) => {
+        saveTakeaway({
+          text: done.takeaway,
+          object_name: metaRef.current?.name ?? "",
+        });
         setStory((s) =>
           s.phase === "streaming"
             ? { phase: "done", meta: s.meta, text: s.text, done }
             : s,
-        ),
+        );
+      },
       onError: (err) =>
         setStory((s) =>
           s.phase === "streaming"
@@ -148,6 +173,7 @@ export default function Home() {
   };
 
   const handleSelectPhoto = async (file: File) => {
+    lastFileRef.current = file;
     abortRef.current?.abort();
     stopStory();
     const ctrl = new AbortController();
@@ -165,8 +191,12 @@ export default function Home() {
       setAnalysis({ phase: "done", result });
     } catch (e) {
       if (ctrl.signal.aborted) return;
-      setAnalysis({ phase: "error", message: errorMessage(e) });
+      setAnalysis({ phase: "error", error: describeError(e) });
     }
+  };
+
+  const handleRetryAnalyze = () => {
+    if (lastFileRef.current) void handleSelectPhoto(lastFileRef.current);
   };
 
   // Give up on a stuck analyze: the request is aborted and the page returns to the picker
@@ -178,11 +208,21 @@ export default function Home() {
 
   const result = analysis.phase === "done" ? analysis.result : null;
 
-  // Tapping a candidate (card or chip) closes the current stream and starts a new one
+  // Tapping a candidate (card or chip) closes the current stream and starts a new one.
+  // From the pick view the box flashes first so the tap visibly lands on the photo.
   const handlePick = (id: string) => {
     if (!result) return;
     setSelectedId(id);
-    startStory(result.session_id, id);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    if (story.phase !== "idle") {
+      startStory(result.session_id, id);
+      return;
+    }
+    setFlashId(id);
+    flashTimerRef.current = setTimeout(() => {
+      setFlashId(null);
+      startStory(result.session_id, id);
+    }, FLASH_MS);
   };
 
   // Once a story starts, bring the hero crop to the top of the viewport
@@ -262,28 +302,25 @@ export default function Home() {
           />
           {story.phase === "done" && (
             <>
-              <div data-section="takeaway">
+              <div
+                className="enter"
+                style={{ transitionDelay: "300ms" }}
+                data-section="takeaway"
+              >
                 <Takeaway text={story.done.takeaway} />
               </div>
               <Sources sources={story.done.sources} />
             </>
           )}
           {story.phase === "error" && (
-            <div className="space-y-2" role="alert">
-              <p className="rounded-xl bg-mark-soft px-3 py-2 text-sm text-mark">
-                語りを取得できませんでした（{story.status || "通信"}:{" "}
-                {story.detail}）
-              </p>
-              {selectedId && (
-                <button
-                  type="button"
-                  onClick={() => startStory(result.session_id, selectedId)}
-                  className="rounded-full bg-moss px-5 py-2 font-bold text-white active:bg-moss-deep"
-                >
-                  もう一度
-                </button>
-              )}
-            </div>
+            <ErrorNotice
+              error={describeStatus(story.status, "narrate")}
+              onRetry={
+                selectedId
+                  ? () => startStory(result.session_id, selectedId)
+                  : undefined
+              }
+            />
           )}
         </section>
 
@@ -342,6 +379,7 @@ export default function Home() {
     <main className="mx-auto max-w-md space-y-4 px-4 py-6">
       {header}
       {!preview && <PhotoInput onSelect={handleSelectPhoto} />}
+      {!preview && <TakeawayHistory />}
 
       {stage && (
         <p
@@ -368,12 +406,11 @@ export default function Home() {
         </div>
       )}
       {analysis.phase === "error" && (
-        <p
-          className="rounded-xl bg-mark-soft px-3 py-2 text-sm text-mark"
-          role="alert"
-        >
-          うまく読み取れませんでした（{analysis.message}）
-        </p>
+        <ErrorNotice
+          error={analysis.error}
+          onRetry={handleRetryAnalyze}
+          retryLabel="同じ写真でもう一度"
+        />
       )}
 
       {preview && (
@@ -389,6 +426,7 @@ export default function Home() {
               lineup={result.lineup}
               selectedId={selectedId}
               reveal
+              flashId={flashId}
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
@@ -398,7 +436,10 @@ export default function Home() {
         </div>
       )}
 
-      {hint && (waiting || revealing) && <HintCard text={hint} />}
+      {hint &&
+        (waiting || revealing || (result && result.lineup.length === 0)) && (
+          <HintCard text={hint} />
+        )}
 
       {result && !revealing && (
         <section className="enter space-y-2" data-section="lineup">

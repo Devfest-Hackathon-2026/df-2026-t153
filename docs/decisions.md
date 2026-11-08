@@ -200,3 +200,17 @@
 - 理由：
 - 捨てた理由：(b) 他の API と同じ接頭辞になり、死活確認と区別しにくい（未検証の好み） (c) Cloud Run では `/healthz` がアプリに届かず Google のフロントが 404 を返した（https://cloud.google.com/run/docs/known-issues）
 - 見直し条件：
+
+## D-24 「持ち帰った視点」履歴の保存先（2026-11-08 / ）
+- 候補：(a) 端末の localStorage（キー `sanpolab.takeaways`、最大 10 件、`{text, object_name, at}`） (b) Firestore に端末 ID 付きで保存し、どの端末からでも見られるようにする (c) 保存しない
+- 選択：(a)。`lib/takeaways.ts` に読み書きを隔離し、localStorage が使えない環境（プライベートモード・容量超過）でも try/catch で画面は動く。トップ画面（写真未選択時）に「これまでの散歩の目」として折りたたみ表示
+- 理由：
+- 捨てた理由：(b) 認証も端末 ID も無い今、個人の閲覧履歴をサーバに置く根拠と保護の手当てが用意できない。API と Firestore の変更も要る (c) 「次の散歩で転用できる観察パターン」（語りのルール 6）を渡す以上、見返せないと渡したことにならない
+- 見直し条件：
+
+## D-25 写真入力の capture 属性を外す（2026-11-08 / ）
+- 候補：(a) `<input type="file" accept="image/*" capture="environment">`（カメラ直起動） (b) `capture` なしで `accept="image/*"` のみ（OS の選択 UI に任せる） (c) 「撮る」「選ぶ」のボタンを 2 つ置く
+- 選択：(b)（`components/PhotoInput.tsx`）。ラベルは「写真を撮る・選ぶ」のまま
+- 理由：
+- 捨てた理由：(a) iOS Safari では `capture` があるとカメラしか開かず、フォトライブラリから選べない (c) ボタンが増えて最初の画面が重くなる
+- 見直し条件：

@@ -10,6 +10,8 @@ type Props = {
   selectedId: string | null;
   /** Animate the boxes locking on one by one (first appearance only) */
   reveal?: boolean;
+  /** Box that was just tapped: flashes once before the story view takes over */
+  flashId?: string | null;
 };
 
 // Natural size for the viewBox, plus the rendered width so labels can stay a fixed CSS size
@@ -50,6 +52,7 @@ export default function BoxOverlay({
   lineup,
   selectedId,
   reveal = false,
+  flashId = null,
 }: Props) {
   const [size, setSize] = useState<Size | null>(null);
   const inLineup = new Set(lineup);
@@ -117,6 +120,17 @@ export default function BoxOverlay({
                     strokeWidth={4}
                     strokeLinecap="square"
                     vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                {o.id === flashId && (
+                  <rect
+                    className="flash"
+                    x={x1}
+                    y={y1}
+                    width={x2 - x1}
+                    height={y2 - y1}
+                    fill="#ffffff"
+                    stroke="none"
                   />
                 )}
                 {hot && reveal && (
