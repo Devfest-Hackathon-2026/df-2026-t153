@@ -23,6 +23,10 @@ RETRY_STATUS = (429, 503)
 RETRY_DELAYS = (1.0, 3.0)
 # D-32: after giving up on grounding, the plain call gets this long for its first token
 FALLBACK_FIRST_TOKEN_TIMEOUT = 30.0
+# D-33: Gemini can hang with no error; analyze retries once after this many seconds
+ANALYZE_TIMEOUT = 40.0
+# Deltas are already sent by the time the stream stalls, so this is not retried
+NARRATE_IDLE_TIMEOUT = 25.0
 
 
 class GeminiError(RuntimeError):
@@ -80,19 +84,39 @@ def _photo_and_text(jpeg: bytes, text: str) -> types.Content:
     )
 
 
+async def _generate_inventory(jpeg: bytes) -> tuple[types.GenerateContentResponse, int]:
+    for attempt in range(2):
+        try:
+            res, retries = await asyncio.wait_for(
+                _with_retry(
+                    lambda: _client().aio.models.generate_content(
+                        model=get_settings().gemini_flash_model,
+                        contents=_photo_and_text(jpeg, INVENTORY_PROMPT),
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=Inventory,
+                            thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
+                        ),
+                    )
+                ),
+                ANALYZE_TIMEOUT,
+            )
+            return res, retries + attempt
+        except TimeoutError as e:
+            log.warning(
+                "gemini inventory timeout",
+                extra={"fields": {"timeout_s": ANALYZE_TIMEOUT, "attempt": attempt + 1}},
+            )
+            if attempt == 1:
+                raise GeminiUnavailableError(
+                    f"Gemini did not respond within {ANALYZE_TIMEOUT:.0f}s (after 1 retry)"
+                ) from e
+    raise AssertionError("unreachable")
+
+
 async def list_inventory(jpeg: bytes) -> Inventory:
     t0 = time.perf_counter()
-    res, retries = await _with_retry(
-        lambda: _client().aio.models.generate_content(
-            model=get_settings().gemini_flash_model,
-            contents=_photo_and_text(jpeg, INVENTORY_PROMPT),
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=Inventory,
-                thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
-            ),
-        )
-    )
+    res, retries = await _generate_inventory(jpeg)
     log.info(
         "gemini inventory",
         extra={
@@ -212,8 +236,16 @@ async def stream_narration(
     async def chunks() -> AsyncIterator[types.GenerateContentResponse]:
         yield first
         try:
-            async for res in stream:
-                yield res
+            while True:
+                try:
+                    yield await asyncio.wait_for(anext(stream), NARRATE_IDLE_TIMEOUT)
+                except StopAsyncIteration:
+                    return
+        except TimeoutError as e:
+            log.error("gemini stream stalled", extra={"fields": {"idle_s": NARRATE_IDLE_TIMEOUT}})
+            raise GeminiUnavailableError(
+                f"Gemini stream stalled for {NARRATE_IDLE_TIMEOUT:.0f}s mid-narration"
+            ) from e
         except errors.APIError as e:
             raise GeminiError(f"Gemini API error {e.code} mid-stream: {e.message}") from e
         except httpx2.TransportError as e:

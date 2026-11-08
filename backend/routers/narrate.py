@@ -58,3 +58,9 @@ async def narrate(session_id: str, pick_id: str) -> AsyncIterator[ServerSentEven
     except gemini.GeminiError as e:
         status = 503 if isinstance(e, gemini.GeminiUnavailableError) else 502
         yield _error(session_id, status, str(e))
+    except Exception:
+        # Without an error event the client just sees a silent, stuck stream
+        log.exception("narration crashed", extra={"fields": {"session_id": session_id}})
+        yield ServerSentEvent(
+            event="error", data=NarrateError(status=500, detail="narration failed")
+        )
