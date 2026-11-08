@@ -84,6 +84,8 @@ class NarrateMeta(BaseModel):
     pick_id: str
     name: str
     box: list[int] = Field(min_length=4, max_length=4)
+    # Place name for the photo's location; None until the session carries a resolved name
+    place: str | None = None
 
 
 class NarrateSource(BaseModel):

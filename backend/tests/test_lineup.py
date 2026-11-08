@@ -1,11 +1,12 @@
 from schemas import InventoryObject
-from services.lineup import build_lineup
+from services.lineup import build_lineup, normalize_name
 
 
 def _o(id: str, **over: object) -> InventoryObject:
     base: dict[str, object] = {
         "id": id,
-        "name": "x",
+        # Distinct names by default: same-name objects are merged on purpose (D-31)
+        "name": id,
         "salience": 3,
         "detail": "d",
         "sure": True,
@@ -52,3 +53,22 @@ def test_falls_back_to_cut_objects_only_when_nothing_is_whole() -> None:
 
 def test_empty_when_nothing_eligible() -> None:
     assert build_lineup([_o("x", kind="transient")]) == []
+
+
+def test_normalize_name_ignores_wording_only_differences() -> None:
+    assert normalize_name("マンホールの蓋") == normalize_name("マンホール 蓋") == "マンホール"
+    assert normalize_name("側溝の蓋") == normalize_name("側溝")
+    # Short words keep their suffix so unrelated things do not merge
+    assert normalize_name("看板") == "看板"
+    assert normalize_name("表札") != normalize_name("表示板")
+
+
+def test_merges_same_name_keeping_the_stronger_one() -> None:
+    objs = [
+        _o("m_low", name="マンホール", potential=3),
+        _o("m_high", name="マンホールの蓋", potential=5),
+        _o("m_mid", name="マンホール 蓋", potential=4),
+        _o("post", name="郵便ポスト", potential=4),
+        _o("wall", name="石垣", potential=2),
+    ]
+    assert build_lineup(objs) == ["m_high", "post", "wall"]

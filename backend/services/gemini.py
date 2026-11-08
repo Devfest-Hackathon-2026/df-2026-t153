@@ -21,6 +21,8 @@ THINKING_LEVEL = types.ThinkingLevel.LOW
 # D-05: retry only transient quota/availability errors; delays before retry 1 and 2
 RETRY_STATUS = (429, 503)
 RETRY_DELAYS = (1.0, 3.0)
+# D-32: after giving up on grounding, the plain call gets this long for its first token
+FALLBACK_FIRST_TOKEN_TIMEOUT = 30.0
 
 
 class GeminiError(RuntimeError):
@@ -138,14 +140,15 @@ class _TakeawaySplitter:
         return head[: len(head) - keep]
 
 
-async def _open_stream(
-    jpeg: bytes, prompt: str
-) -> tuple[types.GenerateContentResponse, AsyncIterator[types.GenerateContentResponse]]:
+type _Stream = tuple[types.GenerateContentResponse, AsyncIterator[types.GenerateContentResponse]]
+
+
+async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Stream:
     stream = await _client().aio.models.generate_content_stream(
         model=get_settings().gemini_flash_model,
         contents=_photo_and_text(jpeg, prompt),
         config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
+            tools=[types.Tool(google_search=types.GoogleSearch())] if grounding else None,
             thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
         ),
     )
@@ -156,10 +159,50 @@ async def _open_stream(
         raise GeminiError("Gemini returned an empty stream") from e
 
 
-async def stream_narration(jpeg: bytes, prompt: str) -> AsyncIterator[str | NarrateDone]:
+async def _open_with_fallback(
+    jpeg: bytes, prompt: str, first_token_timeout: float
+) -> tuple[_Stream, int, bool]:
+    """grounding ありで開き、最初のトークンが間に合わなければ grounding なしで開き直す。
+
+    Returns (stream, retries, grounded). wait_for cancels the slow call, which closes
+    its HTTP stream; the plain call then gets FALLBACK_FIRST_TOKEN_TIMEOUT.
+    """
+    t0 = time.perf_counter()
+    try:
+        opened, retries = await _with_retry(
+            lambda: asyncio.wait_for(_open_stream(jpeg, prompt, True), first_token_timeout)
+        )
+        return opened, retries, True
+    except TimeoutError:
+        waited_ms = round((time.perf_counter() - t0) * 1000)
+    log.warning(
+        "narration fallback",
+        extra={"fields": {"fallback": "no_grounding", "waited_ms": waited_ms}},
+    )
+    try:
+        opened, retries = await _with_retry(
+            lambda: asyncio.wait_for(
+                _open_stream(jpeg, prompt, False), FALLBACK_FIRST_TOKEN_TIMEOUT
+            )
+        )
+    except TimeoutError as e:
+        raise GeminiUnavailableError(
+            f"narration produced no text within {FALLBACK_FIRST_TOKEN_TIMEOUT:.0f}s "
+            "even without grounding"
+        ) from e
+    return opened, retries, False
+
+
+async def stream_narration(
+    jpeg: bytes, prompt: str, first_token_timeout: float | None = None
+) -> AsyncIterator[str | NarrateDone]:
     """語りの断片（str）を順に返し、最後に NarrateDone を1つ返す。"""
     t0 = time.perf_counter()
-    (first, stream), retries = await _with_retry(lambda: _open_stream(jpeg, prompt))
+    if first_token_timeout is None:
+        first_token_timeout = get_settings().narrate_first_token_timeout
+    (first, stream), retries, grounded = await _open_with_fallback(
+        jpeg, prompt, first_token_timeout
+    )
     splitter = _TakeawaySplitter()
     sources: dict[str, NarrateSource] = {}
     queries: list[str] = []
@@ -200,6 +243,7 @@ async def stream_narration(jpeg: bytes, prompt: str) -> AsyncIterator[str | Narr
             "fields": {
                 "model": get_settings().gemini_flash_model,
                 "retries": retries,
+                "grounding": grounded,
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000),
                 "finish_reason": str(finish_reason),
                 "sources": len(sources),

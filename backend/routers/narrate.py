@@ -40,7 +40,8 @@ async def narrate(session_id: str, pick_id: str) -> AsyncIterator[ServerSentEven
         return
 
     yield ServerSentEvent(
-        event="meta", data=NarrateMeta(pick_id=pick.id, name=pick.name, box=pick.box)
+        event="meta",
+        data=NarrateMeta(pick_id=pick.id, name=pick.name, box=pick.box, place=session.get("place")),
     )
     prompt = build_narration_prompt(
         session["scene"],

@@ -22,7 +22,7 @@
 
 | event | data | 回数 |
 |---|---|---|
-| `meta` | `{pick_id, name, box}` | 1 |
+| `meta` | `{pick_id, name, box, place}` | 1 |
 | `delta` | 語りの断片（JSON 文字列。連結すると本文） | 複数 |
 | `done` | `{takeaway, sources[{title, uri}], search_entry_html}` | 1（最後） |
 | `error` | `{status, detail}`（status は HTTP 相当：404 session なし / 400 pick_id が lineup 外 / 502 / 503） | 0〜1（来たら終了） |

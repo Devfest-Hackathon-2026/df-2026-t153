@@ -21,6 +21,9 @@ class Settings:
     storage_disabled: bool
     photo_bucket: str
     local_photo_dir: Path
+    # Seconds to wait for the first narration token with Search grounding before
+    # retrying without it (D-32)
+    narrate_first_token_timeout: float
 
 
 @lru_cache
@@ -35,6 +38,7 @@ def get_settings() -> Settings:
         firestore_disabled=_flag("FIRESTORE_DISABLED"),
         storage_disabled=_flag("STORAGE_DISABLED"),
         photo_bucket=os.environ.get("PHOTO_BUCKET", ""),
+        narrate_first_token_timeout=float(os.environ.get("NARRATE_FIRST_TOKEN_TIMEOUT", "12")),
         local_photo_dir=Path(tempfile.gettempdir()) / "sanpolab-photos",
     )
 
