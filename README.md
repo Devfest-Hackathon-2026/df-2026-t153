@@ -27,6 +27,15 @@ sh scripts/deploy-frontend.sh https://sanpolab-api-987498575224.asia-northeast1.
 
 - `ALLOWED_ORIGINS` に Hosting のオリジンを入れる：`https://sanpolab.web.app,https://sanpolab.firebaseapp.com`（ローカル開発を残すなら `http://localhost:3000` も）
 - 未認証で呼べるようにする（`roles/run.invoker` を `allUsers` に）。これが無いとブラウザからは 403 になる
+- `scripts/deploy-backend.sh` は `ALLOWED_ORIGINS` の既定に上の3つを入れ、台数の上限 5・同時 20 件でデプロイする
+
+## データの保持
+
+- 写真（Cloud Storage `sessions/{id}.jpg`、EXIF なし）、解析結果（Firestore `sessions`）、評価（Firestore `feedback`）は **7 日で自動削除**する
+  - Firestore：各ドキュメントの `expire_at`（保存時刻 + 7 日）に TTL ポリシーを設定
+  - Cloud Storage：バケットのライフサイクルルール（作成から 7 日で削除）
+- 写真の位置情報（EXIF GPS）は小数第 2 位（約 1 km）に丸めて保存し、語りの「土地柄」にだけ使う。レスポンスには含めない
+- アカウント機能は無く、利用者を特定する情報は保存しない
 
 ## 構成
 

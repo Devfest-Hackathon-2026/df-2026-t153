@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Any, Protocol
 
@@ -6,6 +7,8 @@ from google.cloud import firestore
 from config import get_settings
 
 COLLECTION = "feedback"
+# Firestore TTL deletes a document once this field is in the past (README: データの保持)
+RETENTION = timedelta(days=7)
 
 
 def doc_id(session_id: str, pick_id: str) -> str:
@@ -25,7 +28,13 @@ class FirestoreFeedbackStore:
         await (
             self._db.collection(COLLECTION)
             .document(doc_id(session_id, pick_id))
-            .set({**data, "created_at": firestore.SERVER_TIMESTAMP})
+            .set(
+                {
+                    **data,
+                    "created_at": firestore.SERVER_TIMESTAMP,
+                    "expire_at": datetime.now(UTC) + RETENTION,
+                }
+            )
         )
 
 

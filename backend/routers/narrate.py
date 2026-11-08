@@ -12,10 +12,11 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 
-def _error(session_id: str, status: int, detail: str) -> ServerSentEvent:
+def _error(session_id: str, status: int, detail: str, cause: str = "") -> ServerSentEvent:
+    # detail goes to anyone calling the API; the raw cause (paths, model output) only to the log
     log.error(
         "narration failed",
-        extra={"fields": {"session_id": session_id, "status": status, "error": detail}},
+        extra={"fields": {"session_id": session_id, "status": status, "error": cause or detail}},
     )
     return ServerSentEvent(event="error", data=NarrateError(status=status, detail=detail))
 
@@ -36,7 +37,7 @@ async def narrate(session_id: str, pick_id: str) -> AsyncIterator[ServerSentEven
         jpeg = await storage.load_photo(session["photo_uri"])
     except Exception as e:
         log.exception("photo load failed", extra={"fields": {"session_id": session_id}})
-        yield _error(session_id, 500, f"photo load failed: {e}")
+        yield _error(session_id, 500, "photo unavailable", f"photo load failed: {e}")
         return
 
     yield ServerSentEvent(
@@ -57,7 +58,8 @@ async def narrate(session_id: str, pick_id: str) -> AsyncIterator[ServerSentEven
                 yield ServerSentEvent(event="delta", data=item)
     except gemini.GeminiError as e:
         status = 503 if isinstance(e, gemini.GeminiUnavailableError) else 502
-        yield _error(session_id, status, str(e))
+        detail = "upstream unavailable" if status == 503 else "narration failed"
+        yield _error(session_id, status, detail, str(e))
     except Exception:
         # Without an error event the client just sees a silent, stuck stream
         log.exception("narration crashed", extra={"fields": {"session_id": session_id}})

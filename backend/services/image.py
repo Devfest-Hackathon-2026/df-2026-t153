@@ -7,6 +7,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 pillow_heif.register_heif_opener()
 
 MAX_EDGE = 1568
+# Phone cameras top out around 50 MP; anything bigger is a decompression bomb risk on 1 GiB
+MAX_PIXELS = 60_000_000
 _GPS_IFD = 0x8825
 
 
@@ -39,8 +41,11 @@ def prepare(data: bytes) -> PreparedImage:
     """HEIC/JPEG 等を読み、向きを正して最大辺 MAX_EDGE の JPEG にする。"""
     try:
         img = Image.open(io.BytesIO(data))
+        # Image.open only reads the header, so the size is known before decoding the pixels
+        if img.width * img.height > MAX_PIXELS:
+            raise ImageDecodeError(f"too many pixels: {img.width}x{img.height}")
         img.load()
-    except (UnidentifiedImageError, OSError) as e:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
         raise ImageDecodeError(f"画像として読めません: {e}") from e
 
     gps = _read_gps(img)

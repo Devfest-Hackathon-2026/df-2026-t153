@@ -10,13 +10,22 @@ from services import gemini, image, lineup, sessions, storage
 router = APIRouter()
 log = logging.getLogger(__name__)
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# 2 decimals is about 1 km: enough for the narration's sense of place, not a home address
+GPS_DECIMALS = 2
+
 
 @router.post("/api/analyze", response_model=AnalyzeResponse)
 async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> AnalyzeResponse:
+    data = await image_file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        log.warning("upload too large", extra={"fields": {"limit_bytes": MAX_UPLOAD_BYTES}})
+        raise HTTPException(status_code=413, detail="image too large")
     try:
-        prepared = image.prepare(await image_file.read())
+        prepared = image.prepare(data)
     except image.ImageDecodeError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        log.warning("image decode failed", extra={"fields": {"error": str(e)}})
+        raise HTTPException(status_code=400, detail="image decode failed") from e
 
     session_id = uuid.uuid4().hex
     try:
@@ -27,11 +36,17 @@ async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> Ana
             "inventory failed",
             extra={"fields": {"session_id": session_id, "status": status, "error": str(e)}},
         )
-        raise HTTPException(status_code=status, detail=str(e)) from e
+        # The raw error carries model names and model output; it stays in the log only
+        detail = "upstream unavailable" if status == 503 else "analysis failed"
+        raise HTTPException(status_code=status, detail=detail) from e
 
     ids = lineup.build_lineup(inv.objects)
     photo_uri = await storage.save_photo(session_id, prepared.jpeg)
-    gps = {"lat": prepared.gps[0], "lon": prepared.gps[1]} if prepared.gps else None
+    gps = (
+        {"lat": round(prepared.gps[0], GPS_DECIMALS), "lon": round(prepared.gps[1], GPS_DECIMALS)}
+        if prepared.gps
+        else None
+    )
     await sessions.get_session_store().save(
         session_id,
         {**inv.model_dump(), "lineup": ids, "photo_uri": photo_uri, "gps": gps},

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Any, Protocol
 
@@ -6,6 +7,8 @@ from google.cloud import firestore
 from config import get_settings
 
 COLLECTION = "sessions"
+# Firestore TTL deletes a document once this field is in the past (README: データの保持)
+RETENTION = timedelta(days=7)
 
 
 class SessionStore(Protocol):
@@ -21,7 +24,13 @@ class FirestoreSessionStore:
         await (
             self._db.collection(COLLECTION)
             .document(session_id)
-            .set({**data, "created_at": firestore.SERVER_TIMESTAMP})
+            .set(
+                {
+                    **data,
+                    "created_at": firestore.SERVER_TIMESTAMP,
+                    "expire_at": datetime.now(UTC) + RETENTION,
+                }
+            )
         )
 
     async def get(self, session_id: str) -> dict[str, Any] | None:

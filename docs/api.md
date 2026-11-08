@@ -14,7 +14,7 @@
 - `objects[]`: `{id, name, salience 1-5, detail, sure, kind: fixture|transient|person, box [x1,y1,x2,y2] 0-1000, whole, potential 1-5}`
 - `texts[]`: `{content, where}`。Gemini が texts に入れ忘れた文字は、サーバが objects[].detail から補う（where は object の name）
 - `lineup[]`: 抽選候補の `objects[].id`（`sure && kind==fixture && whole && salience>=3` を `(potential, salience)` 降順で最大3件）。1件も無いときだけ `whole` を外して選び直す（D-11）。それでも無ければ空配列
-- EXIF GPS はレスポンスにも列挙プロンプトにも含めず、session にだけ保存する
+- EXIF GPS はレスポンスにも列挙プロンプトにも含めず、小数第 2 位（約 1 km）に丸めて session にだけ保存する
 
 ### /api/narrate の中身
 
@@ -42,11 +42,13 @@
 
 ## エラー
 
-- 画像として読めない場合は 400
-- Gemini が 429/503 を返し、再試行（1s, 3s の最大2回）でも回復しない場合は 503。本文に理由を付ける
-- Gemini との通信が切れた場合も 503（再試行はしない）。本文に理由を付ける
+- 写真が 10 MB を超える場合は 413（`{"detail": "image too large"}`）
+- 画像として読めない、または 6,000 万画素を超える場合は 400（`{"detail": "image decode failed"}`）
+- `detail` は固定文だけ返す（analyze：`analysis failed` / `upstream unavailable`、narrate の `error`：`narration failed` / `upstream unavailable` / `photo unavailable`）。Gemini の生のエラーや例外文はログにだけ残す
+- Gemini が 429/503 を返し、再試行（1s, 3s の最大2回）でも回復しない場合は 503
+- Gemini との通信が切れた場合も 503（再試行はしない）
 - analyze：Gemini が 40 秒応答しなければ 1 回だけ呼び直し、それでも応答しなければ 503（D-33）
 - narrate：最初の文字が 12 秒で来なければ grounding なしに切り替え、それも 30 秒来なければ `error` 503（D-32）。本文の途中で 25 秒止まった場合も `error` 503（送った本文と重なるので呼び直さない、D-33）
 - narrate：想定外の例外でも必ず `error` イベント（500、`detail` は固定文）を送ってから閉じる
 
-- Gemini の出力が Pydantic でパースできない場合は 502。本文に理由を付ける
+- Gemini の出力が Pydantic でパースできない場合は 502
