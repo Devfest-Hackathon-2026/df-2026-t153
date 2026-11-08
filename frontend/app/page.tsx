@@ -12,6 +12,7 @@ import Lineup from "@/components/Lineup";
 import Narration from "@/components/Narration";
 import PhotoInput from "@/components/PhotoInput";
 import ScanOverlay from "@/components/ScanOverlay";
+import SearchSuggestions from "@/components/SearchSuggestions";
 import Sources from "@/components/Sources";
 import Takeaway from "@/components/Takeaway";
 import TakeawayHistory from "@/components/TakeawayHistory";
@@ -310,6 +311,9 @@ export default function Home() {
                 <Takeaway text={story.done.takeaway} />
               </div>
               <Sources sources={story.done.sources} />
+              {story.done.search_entry_html && (
+                <SearchSuggestions html={story.done.search_entry_html} />
+              )}
             </>
           )}
           {story.phase === "error" && (

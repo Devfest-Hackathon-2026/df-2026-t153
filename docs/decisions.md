@@ -214,3 +214,24 @@
 - 理由：
 - 捨てた理由：(a) iOS Safari では `capture` があるとカメラしか開かず、フォトライブラリから選べない (c) ボタンが増えて最初の画面が重くなる
 - 見直し条件：
+
+## D-26 Google 検索候補（Search Suggestions）の表示（2026-11-08 / ）
+- 候補：(a) `search_entry_html` を sandbox 付き iframe（`srcdoc`、スクリプト不可、リンクは新しいタブ）で語りカード内に描画 (b) `dangerouslySetInnerHTML` でページに直接差し込む (c) 表示しない
+- 選択：(a)（`components/SearchSuggestions.tsx`）。Vertex AI の要件「Search grounding を使った応答では Search Suggestions を本番で必ず表示する／提供された HTML・CSS を改変しない／応答と同じ幅／応答が見えている間は表示し続ける／タップで検索結果ページへ直行」に合わせ、語りカードの出典の下に全幅で置く（https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-search-suggestions）
+- 理由：
+- 捨てた理由：(b) 外部由来の HTML をページ本体に入れることになり、スニペットの `<style>` が `.container` `.chip` などの一般的なクラス名でページ側と衝突する (c) 利用要件違反。Search grounding を使う以上、表示しないという選択肢はない
+- 見直し条件：
+
+## D-27 デモ・審査期間（11/10〜11/14）の Cloud Run 最低インスタンス数（2026-11-08 / ）
+- 候補：(a) `MIN_INSTANCES=1` にして初回の起動待ち（約 20 秒）を無くす (b) 0 のまま（使わない間は無料。最初の 1 回だけ遅い） (c) 1 にするのはデモ撮影の時間帯だけ
+- 選択：
+- 理由：
+- 捨てた理由：
+- 見直し条件：
+- コスト概算（Cloud Billing Catalog API で取得した asia-northeast1 の単価、2026-11-08、USD）：
+  - 最低インスタンスの待機中：CPU $0.0000025/vCPU 秒、メモリ $0.0000025/GiB 秒（SKU「Services Min Instance CPU / Memory (Request-based billing)」）
+  - リクエスト処理中：CPU $0.000024/vCPU 秒、メモリ $0.0000025/GiB 秒、リクエスト $0.40/100 万件（200 万件まで無料）
+  - 現在の構成は 1 vCPU / 1 GiB。11/10 00:00〜11/14 24:00 = 5 日 = 432,000 秒を常駐させると、待機分は CPU $1.08 ＋ メモリ $1.08 = **約 $2.2（約 330 円、1 ドル 150 円換算）**
+  - 処理中の分は使った量だけ加算。1 セッション（analyze ＋ narrate）を約 30 vCPU 秒とすると 200 セッションで約 $0.15。無料枠（月 180,000 vCPU 秒・360,000 GiB 秒）に収まる見込み。待機分が無料枠に含まれるかは未確認
+  - 7 日に延ばしても約 $3。Gemini の呼び出し料金は別（Vertex AI 側）
+  - クレジット残高は gcloud から取得できなかった（Cloud Billing の予算 API が未有効・課金アカウントの閲覧権限が必要）。残高は Console の「お支払い」で確認する
