@@ -75,7 +75,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
 # 環境変数は .env.example を参照して設定する（*_DISABLED=1 ならクラウドに書かない）
 uvicorn main:app --reload --port 8080
-# http://localhost:8080/healthz
+# http://localhost:8080/health
 ```
 
 ### frontend
