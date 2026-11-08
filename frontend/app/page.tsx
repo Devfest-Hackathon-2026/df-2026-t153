@@ -66,8 +66,8 @@ const STAGE_MESSAGES = {
 function stageMessage(stage: 1 | 2 | 3, elapsed: number): string {
   if (stage !== 2) return STAGE_MESSAGES[stage];
   if (elapsed >= STUCK_AFTER_S)
-    return "時間がかかっています。電波の良い所でもう一度お試しください";
-  if (elapsed >= SLOW_AFTER_S) return "もう少しかかっています";
+    return "かなり時間がかかっています。電波の良い所でもう一度お試しください";
+  if (elapsed >= SLOW_AFTER_S) return "時間がかかっています";
   return STAGE_MESSAGES[2];
 }
 
