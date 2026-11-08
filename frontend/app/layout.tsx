@@ -1,5 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted at build time by next/font; no request to Google Fonts at runtime
+const notoSansJP = Noto_Sans_JP({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-noto-sans-jp",
+});
 
 export const metadata: Metadata = {
   title: "SanpoLab",
@@ -16,7 +24,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={notoSansJP.variable}>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

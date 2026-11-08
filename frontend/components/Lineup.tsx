@@ -40,7 +40,7 @@ export default function Lineup({
                 role="option"
                 aria-selected={selected}
                 onClick={() => onSelect(o.id)}
-                className={`rounded-full px-4 py-1.5 text-sm font-bold shadow-card transition-colors ${
+                className={`rounded-full px-4 py-1.5 text-sm font-bold shadow-card transition-[colors,transform] active:scale-95 ${
                   selected
                     ? "bg-mark text-white"
                     : "border border-line bg-card text-ink active:bg-mark-soft"
@@ -60,13 +60,17 @@ export default function Lineup({
       {items.map((o, i) => {
         const selected = o.id === selectedId;
         return (
-          <li key={o.id}>
+          <li
+            key={o.id}
+            className="enter"
+            style={{ transitionDelay: `${i * 70}ms` }}
+          >
             <button
               type="button"
               data-testid="lineup-chip"
               aria-pressed={selected}
               onClick={() => onSelect(o.id)}
-              className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left shadow-card transition-colors ${
+              className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left shadow-card transition-[colors,transform] active:scale-[0.98] ${
                 selected
                   ? "border-mark bg-mark-soft"
                   : "border-line bg-card active:bg-moss-soft"

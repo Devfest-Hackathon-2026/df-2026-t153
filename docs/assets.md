@@ -42,3 +42,4 @@
 
 | 名前 | 用途 | 出典 | ライセンス | 確認 |
 |---|---|---|---|---|
+| Noto Sans JP | 本文フォント（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Sans+JP | SIL Open Font License 1.1 | 未確認 |

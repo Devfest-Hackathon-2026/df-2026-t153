@@ -137,3 +137,24 @@
 - 理由：
 - 捨てた理由：(b) 写真は backend から取り直せない（GCS の gs:// のみ）ので blob URL と解析結果を Context か sessionStorage に持ち回る必要があり、リロードで消える。静的エクスポートではクエリをクライアントで読む手間も増える (c) 画面往復が増え、スマホで「読む → 評価する → 次の主役」の流れが途切れる
 - 見直し条件：
+
+## D-16 画面遷移のアニメーション方式（2026-11-08 / ）
+- 候補：(a) React 19 の `ViewTransition` コンポーネント（Next.js では `experimental.viewTransition: true` が必要） (b) CSS の `@starting-style` と transition / keyframes だけで入場・切り替えを作る (c) アニメーションライブラリ（motion など）を追加する
+- 選択：(b)。`.enter`（@starting-style のフェード＋8px スライド）、`.lock-on` / `.pulse-ring`（SVG の枠）、`.scanline` / `.scan-dot`（待機中の装飾）を `globals.css` に置き、`prefers-reduced-motion: reduce` では duration と delay を 0 にして装飾層（`.decor`）を消す
+- 理由：
+- 捨てた理由：(a) Next.js 公式が本番非推奨と明記する experimental フラグで、凍結前日に入れる判断ができない（https://nextjs.org/docs/app/api-reference/config/next-config-js/viewTransition） (c) 入場と枠の動きだけなら CSS で足り、依存とバンドル（motion は全体で約 34KB）を増やす理由がない
+- 見直し条件：
+
+## D-17 写真解析の待機表示（2026-11-08 / ）
+- 候補：(a) 経過秒のカウンタ（「検出中… 12秒」） (b) 擬似進捗バー（実測の分布に合わせて 85% まで進め、応答で 100%） (c) サーバの処理順と同じ 3 段階のメッセージ（写真を読んでいます → 写っている物を数えています → 主役を選んでいます）＋写真の上の装飾（走査線 → 格子と点灯）＋観察ヒント 1 枚
+- 選択：(c)。段階 1→2 は 3 秒で切り替え、段階 3 は応答後に枠が 1 個ずつ現れる間（最大約 2 秒）だけ出す。ヒントは `lib/hints.ts` の 10 本から写真ごとに 1 本（直前と同じ物は避ける）。25 秒を超えたら「もう少しかかっています」、60 秒で「時間がかかっています。電波の良い所でもう一度お試しください」と中断ボタン（AbortController）を出す
+- 理由：
+- 捨てた理由：(a) 増える秒数を見せるだけで待ちが長く感じる (b) 実際の進捗ではない数字を出すことになり、85% で止まる挙動は見る人に「正直でない」と映る
+- 見直し条件：analyze の応答時間の分布が変わったら 3 秒 / 25 秒 / 60 秒のしきい値を見直す（2026-11-08 の実測は 23・36・89 秒）。Cloud Run 上で 60 秒超が珍しくなければ、中断より先にサーバ側のタイムアウトと再試行を検討する
+
+## D-18 本文フォント（2026-11-08 / ）
+- 候補：(a) システムフォントのまま（iOS: ヒラギノ / Android: Noto Sans CJK / Windows: 游ゴシック・メイリオ） (b) Noto Sans JP を `next/font/google` でビルド時に自己ホスト (c) 別の Web フォント（M PLUS、BIZ UDPGothic など）
+- 選択：(b)。`layout.tsx` で `Noto_Sans_JP`（可変ウェイト、`display: swap`）を読み、`@theme` の `--font-sans` に当てる。実行時に Google Fonts へは接続しない（https://nextjs.org/docs/app/api-reference/components/font）
+- 理由：
+- 捨てた理由：(a) 端末ごとに見た目が変わり、Windows ではデモ録画の字面が崩れる (c) 可読性と太字のバリエーションで Noto Sans JP に劣るか、好みの域を出ない
+- 見直し条件：

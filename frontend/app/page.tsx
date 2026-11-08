@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import BoxOverlay from "@/components/BoxOverlay";
+import BoxOverlay, {
+  PHOTO_CLASS,
+  revealDuration,
+} from "@/components/BoxOverlay";
 import HeroCrop from "@/components/HeroCrop";
+import HintCard from "@/components/HintCard";
 import Lineup from "@/components/Lineup";
 import Narration from "@/components/Narration";
 import PhotoInput from "@/components/PhotoInput";
+import ScanOverlay from "@/components/ScanOverlay";
 import Sources from "@/components/Sources";
 import Takeaway from "@/components/Takeaway";
 import { analyze, ApiError, type AnalyzeResponse } from "@/lib/api";
+import { pickHint } from "@/lib/hints";
 import {
   narrate,
   type NarrateDone,
@@ -41,6 +47,26 @@ function errorMessage(e: unknown): string {
 
 const card = "rounded-2xl border border-line bg-card p-4 shadow-card";
 
+// Stage 1 -> 2 switch while waiting for analyze (seconds). Matches the real order
+// of work on the server: read the image, then list what is in it, then pick.
+const COUNTING_AFTER_S = 3;
+// Honest wait messages once the usual 10-20s has clearly passed
+const SLOW_AFTER_S = 25;
+const STUCK_AFTER_S = 60;
+const STAGE_MESSAGES = {
+  1: "写真を読んでいます",
+  2: "写っている物を数えています",
+  3: "主役を選んでいます",
+} as const;
+
+function stageMessage(stage: 1 | 2 | 3, elapsed: number): string {
+  if (stage !== 2) return STAGE_MESSAGES[stage];
+  if (elapsed >= STUCK_AFTER_S)
+    return "時間がかかっています。電波の良い所でもう一度お試しください";
+  if (elapsed >= SLOW_AFTER_S) return "もう少しかかっています";
+  return STAGE_MESSAGES[2];
+}
+
 export default function Home() {
   const [analysis, setAnalysis] = useState<AnalyzeState>({ phase: "idle" });
   const [preview, setPreview] = useState<string | null>(null);
@@ -48,6 +74,8 @@ export default function Home() {
   const [elapsed, setElapsed] = useState(0);
   const [story, setStory] = useState<NarrateState>({ phase: "idle" });
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const subRef = useRef<NarrateSubscription | null>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -61,6 +89,20 @@ export default function Home() {
     );
     return () => clearInterval(timer);
   }, [analysis.phase]);
+
+  // Hold the candidates back until the boxes have finished locking on
+  useEffect(() => {
+    if (!revealing || analysis.phase !== "done") return;
+    // With reduced motion the boxes appear at once, so there is nothing to wait for
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const timer = setTimeout(
+      () => setRevealing(false),
+      reduced ? 0 : revealDuration(analysis.result.objects.length),
+    );
+    return () => clearTimeout(timer);
+  }, [revealing, analysis]);
 
   useEffect(() => {
     if (!preview) return;
@@ -114,14 +156,24 @@ export default function Home() {
     setSelectedId(null);
     setStory({ phase: "idle" });
     setPhotoOpen(false);
+    setHint((h) => pickHint(h));
     setElapsed(0);
     setAnalysis({ phase: "loading" });
     try {
-      setAnalysis({ phase: "done", result: await analyze(file, ctrl.signal) });
+      const result = await analyze(file, ctrl.signal);
+      setRevealing(true);
+      setAnalysis({ phase: "done", result });
     } catch (e) {
       if (ctrl.signal.aborted) return;
       setAnalysis({ phase: "error", message: errorMessage(e) });
     }
+  };
+
+  // Give up on a stuck analyze: the request is aborted and the page returns to the picker
+  const handleCancel = () => {
+    abortRef.current?.abort();
+    setAnalysis({ phase: "idle" });
+    setPreview(null);
   };
 
   const result = analysis.phase === "done" ? analysis.result : null;
@@ -148,6 +200,15 @@ export default function Home() {
     ? result.objects.filter((o) => !result.lineup.includes(o.id))
     : [];
 
+  const waiting = analysis.phase === "loading";
+  const stage: 1 | 2 | 3 | null = waiting
+    ? elapsed < COUNTING_AFTER_S
+      ? 1
+      : 2
+    : revealing
+      ? 3
+      : null;
+
   const header = (
     <header className="flex items-end justify-between gap-3">
       <div>
@@ -156,7 +217,7 @@ export default function Home() {
           見慣れた物の「実は…」を、散歩の写真から
         </p>
       </div>
-      {result && (
+      {preview && (
         <PhotoInput
           compact
           disabled={analysis.phase === "loading"}
@@ -280,17 +341,31 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-md space-y-4 px-4 py-6">
       {header}
-      {!result && (
-        <PhotoInput
-          disabled={analysis.phase === "loading"}
-          onSelect={handleSelectPhoto}
-        />
-      )}
+      {!preview && <PhotoInput onSelect={handleSelectPhoto} />}
 
-      {analysis.phase === "loading" && (
-        <p className="text-center text-ink-muted" aria-live="polite">
-          検出中… {elapsed}秒
+      {stage && (
+        <p
+          className="flex items-center justify-center gap-2 text-sm text-ink-muted"
+          aria-live="polite"
+          data-stage={stage}
+        >
+          <span
+            className="breathe inline-block h-2 w-2 rounded-full bg-moss"
+            aria-hidden
+          />
+          {stageMessage(stage, elapsed)}
         </p>
+      )}
+      {waiting && elapsed >= STUCK_AFTER_S && (
+        <div className="enter text-center">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-full border border-line bg-card px-5 py-2 text-sm font-bold text-ink active:bg-mark-soft"
+          >
+            中断する
+          </button>
+        </div>
       )}
       {analysis.phase === "error" && (
         <p
@@ -303,22 +378,30 @@ export default function Home() {
 
       {preview && (
         <div
-          className="overflow-hidden rounded-2xl shadow-card"
+          className="relative mx-auto w-fit overflow-hidden rounded-2xl shadow-card"
           data-section="photo"
         >
-          {originalPhoto ?? (
-            // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
-            <img
+          {result ? (
+            <BoxOverlay
+              key={result.session_id}
               src={preview}
-              alt="送った写真"
-              className="block h-auto w-full opacity-60"
+              objects={result.objects}
+              lineup={result.lineup}
+              selectedId={selectedId}
+              reveal
             />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- blob: URL preview before results arrive
+            <img src={preview} alt="送った写真" className={PHOTO_CLASS} />
           )}
+          {(stage === 1 || stage === 2) && <ScanOverlay stage={stage} />}
         </div>
       )}
 
-      {result && (
-        <section className="space-y-2" data-section="lineup">
+      {hint && (waiting || revealing) && <HintCard text={hint} />}
+
+      {result && !revealing && (
+        <section className="enter space-y-2" data-section="lineup">
           <p className="text-sm text-ink-muted">{result.scene}</p>
           <h2 className="text-lg font-bold">今日の主役の候補</h2>
           <p className="text-xs text-ink-muted">
