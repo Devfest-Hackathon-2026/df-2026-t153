@@ -14,6 +14,13 @@ MIN_INSTANCES="${MIN_INSTANCES:-0}"
 # Caps Gemini spend if the public URL gets scripted: at most MAX_INSTANCES x 20 requests at once
 MAX_INSTANCES="${MAX_INSTANCES:-5}"
 
+# Refuse to deploy on a service account that cannot call Vertex AI: the revision would
+# start fine and then fail every request (D-22: the dedicated SA needs its roles first)
+if ! gcloud projects get-iam-policy "$PROJECT" --flatten="bindings[].members"     --filter="bindings.role=roles/aiplatform.user AND bindings.members=serviceAccount:${SA}"     --format="value(bindings.role)" | grep -q aiplatform.user; then
+  echo "error: ${SA} に roles/aiplatform.user が付いていません。README の『backend 側で必要な設定』の手順で付与するか、SERVICE_ACCOUNT で別のアカウントを指定してください" >&2
+  exit 1
+fi
+
 cd "$(dirname "$0")/../backend"
 
 # ^@^ switches the env-var separator so commas inside ALLOWED_ORIGINS survive
