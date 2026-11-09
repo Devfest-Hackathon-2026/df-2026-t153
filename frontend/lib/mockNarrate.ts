@@ -34,8 +34,6 @@ export const mockNarrate: NarrateFn = (_sessionId, pickId, h) => {
     } else {
       clearInterval(timer);
       h.onDone({
-        takeaway:
-          "同じ形の繰り返しを見つけたら、端がどう処理されているかを見る。",
         sources: [
           { title: "モック出典 1", uri: "https://example.com/1" },
           { title: "モック出典 2", uri: "https://example.com/2" },

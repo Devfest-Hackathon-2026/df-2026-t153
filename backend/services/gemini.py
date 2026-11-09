@@ -11,7 +11,6 @@ from pydantic import ValidationError
 
 from config import get_settings
 from prompts.inventory import INVENTORY_PROMPT
-from prompts.narration import TAKEAWAY_HEADING
 from schemas import Inventory, NarrateDone, NarrateSource
 
 log = logging.getLogger(__name__)
@@ -136,38 +135,12 @@ async def list_inventory(jpeg: bytes) -> Inventory:
         raise GeminiError(f"Gemini output failed schema validation: {e}") from e
 
 
-class _TakeawaySplitter:
-    """語りを素通しし、TAKEAWAY_HEADING 以降は takeaway として溜める。"""
-
-    def __init__(self) -> None:
-        self._pending = ""
-        self.takeaway: str | None = None
-
-    def feed(self, text: str) -> str:
-        if self.takeaway is not None:
-            self.takeaway += text
-            return ""
-        head, sep, tail = (self._pending + text).partition(TAKEAWAY_HEADING)
-        if sep:
-            self._pending, self.takeaway = "", tail
-            return head
-        # The heading can arrive split across chunks; hold back a suffix that may start it
-        keep = next(
-            (
-                n
-                for n in range(len(TAKEAWAY_HEADING) - 1, 0, -1)
-                if head.endswith(TAKEAWAY_HEADING[:n])
-            ),
-            0,
-        )
-        self._pending = head[len(head) - keep :]
-        return head[: len(head) - keep]
+type _Chunk = types.GenerateContentResponse
+# The chunks read so far (the last one carries the first text) and the rest of the stream
+type _Opened = tuple[list[_Chunk], AsyncIterator[_Chunk]]
 
 
-type _Stream = tuple[types.GenerateContentResponse, AsyncIterator[types.GenerateContentResponse]]
-
-
-async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Stream:
+async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Opened:
     stream = await _client().aio.models.generate_content_stream(
         model=get_settings().gemini_flash_model,
         contents=_photo_and_text(jpeg, prompt),
@@ -176,17 +149,24 @@ async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Stream:
             thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
         ),
     )
-    # Pull the first chunk here so 429/503 raised on first read are retried too
-    try:
-        return await anext(stream), stream
-    except StopAsyncIteration as e:
-        raise GeminiError("Gemini returned an empty stream") from e
+    # D-41: read up to the first chunk that has text, so 429/503 raised on the first reads are
+    # retried too and the caller's wait_for covers chunks without text (thoughts, grounding
+    # metadata only). Those chunks are kept: sources and search suggestions can ride on them.
+    prelude: list[_Chunk] = []
+    while True:
+        try:
+            res = await anext(stream)
+        except StopAsyncIteration as e:
+            raise GeminiError("Gemini returned a stream with no text") from e
+        prelude.append(res)
+        if res.text:
+            return prelude, stream
 
 
 async def _open_with_fallback(
     jpeg: bytes, prompt: str, fallback_prompt: str, first_token_timeout: float
-) -> tuple[_Stream, int, bool]:
-    """grounding ありで開き、最初のトークンが間に合わなければ grounding なしで開き直す。
+) -> tuple[_Opened, int, bool]:
+    """grounding ありで開き、本文の最初の文字が間に合わなければ grounding なしで開き直す。
 
     Returns (stream, retries, grounded). wait_for cancels the slow call, which closes
     its HTTP stream; the plain call then gets FALLBACK_FIRST_TOKEN_TIMEOUT.
@@ -229,17 +209,17 @@ async def stream_narration(
     t0 = time.perf_counter()
     if first_token_timeout is None:
         first_token_timeout = get_settings().narrate_first_token_timeout
-    (first, stream), retries, grounded = await _open_with_fallback(
+    (prelude, stream), retries, grounded = await _open_with_fallback(
         jpeg, prompt, fallback_prompt or prompt, first_token_timeout
     )
-    splitter = _TakeawaySplitter()
     sources: dict[str, NarrateSource] = {}
     queries: list[str] = []
     entry_html: str | None = None
     finish_reason: object = None
 
-    async def chunks() -> AsyncIterator[types.GenerateContentResponse]:
-        yield first
+    async def chunks() -> AsyncIterator[_Chunk]:
+        for res in prelude:
+            yield res
         try:
             while True:
                 try:
@@ -257,8 +237,8 @@ async def stream_narration(
             raise _connection_error(e) from e
 
     async for res in chunks():
-        if res.text and (out := splitter.feed(res.text)):
-            yield out
+        if res.text:
+            yield res.text
         cand = res.candidates[0] if res.candidates else None
         if cand is None:
             continue
@@ -281,6 +261,7 @@ async def stream_narration(
                 "model": get_settings().gemini_flash_model,
                 "retries": retries,
                 "grounding": grounded,
+                "prelude_chunks": len(prelude),
                 "elapsed_ms": round((time.perf_counter() - t0) * 1000),
                 "finish_reason": str(finish_reason),
                 "sources": len(sources),
@@ -288,16 +269,4 @@ async def stream_narration(
             }
         },
     )
-    if splitter.takeaway is None:
-        raise GeminiError(
-            f"narration has no '{TAKEAWAY_HEADING}' line (finish_reason={finish_reason})"
-        )
-    try:
-        done = NarrateDone(
-            takeaway=splitter.takeaway.strip(),
-            sources=list(sources.values()),
-            search_entry_html=entry_html,
-        )
-    except ValidationError as e:
-        raise GeminiError(f"narration takeaway failed validation: {e}") from e
-    yield done
+    yield NarrateDone(sources=list(sources.values()), search_entry_html=entry_html)

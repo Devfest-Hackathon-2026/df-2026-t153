@@ -11,7 +11,6 @@ export type NarrateMeta = {
 };
 export type NarrateSource = { title: string; uri: string };
 export type NarrateDone = {
-  takeaway: string;
   sources: NarrateSource[];
   search_entry_html: string | null;
 };

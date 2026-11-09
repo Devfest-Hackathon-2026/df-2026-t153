@@ -1,4 +1,4 @@
-"""D-32: when grounding yields no first token in time, narration retries without it."""
+"""D-32 / D-41: no text in time with grounding -> narration retries without it."""
 
 import asyncio
 from collections.abc import AsyncIterator
@@ -7,33 +7,39 @@ from typing import Any
 
 import pytest
 
-from prompts.narration import TAKEAWAY_HEADING
 from schemas import NarrateDone
 from services import gemini
 
 
-def _chunk(text: str) -> Any:
+def _chunk(text: str | None) -> Any:
     # Only the attributes stream_narration reads
     return SimpleNamespace(text=text, candidates=[])
 
 
-async def _rest() -> AsyncIterator[Any]:
-    yield _chunk(f"\n{TAKEAWAY_HEADING}\n")
-    yield _chunk("次の散歩では端を見る。")
-
-
-def test_falls_back_to_no_grounding_when_first_token_is_slow(
+def test_falls_back_when_only_empty_chunks_arrive_in_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[bool] = []
 
-    async def fake_open(jpeg: bytes, prompt: str, grounding: bool) -> Any:
-        calls.append(grounding)
-        if grounding:
-            await asyncio.sleep(5)  # never returns within the 0.1s budget
-        return _chunk("手前の蓋は縁が高い。"), _rest()
+    async def slow_text() -> AsyncIterator[Any]:
+        yield _chunk(None)  # a chunk arrives at once, but without any text
+        await asyncio.sleep(5)  # the text never comes within the 0.1s budget
+        yield _chunk("遅い本文。")
 
-    monkeypatch.setattr(gemini, "_open_stream", fake_open)
+    async def plain() -> AsyncIterator[Any]:
+        yield _chunk(None)
+        yield _chunk("手前の蓋は縁が高い。")
+        yield _chunk("奥のは低い。")
+
+    class Models:
+        async def generate_content_stream(self, *, model: str, contents: Any, config: Any) -> Any:
+            grounded = config.tools is not None
+            calls.append(grounded)
+            return slow_text() if grounded else plain()
+
+    monkeypatch.setattr(
+        gemini, "_client", lambda: SimpleNamespace(aio=SimpleNamespace(models=Models()))
+    )
 
     async def collect() -> list[str | NarrateDone]:
         return [
@@ -44,8 +50,7 @@ def test_falls_back_to_no_grounding_when_first_token_is_slow(
     items = asyncio.run(collect())
 
     assert calls == [True, False]
-    assert items[0] == "手前の蓋は縁が高い。"
+    assert items[:-1] == ["手前の蓋は縁が高い。", "奥のは低い。"]
     done = items[-1]
     assert isinstance(done, NarrateDone)
-    assert done.takeaway == "次の散歩では端を見る。"
     assert done.sources == [] and done.search_entry_html is None

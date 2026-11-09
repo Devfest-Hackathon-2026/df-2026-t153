@@ -1,7 +1,5 @@
 from schemas import InventoryObject, InventoryText
 
-# The server splits the stream at this line: before it goes out as delta, after it is the takeaway
-TAKEAWAY_HEADING = "### 持ち帰る視点"
 # D-15: below this share of the frame the model invents surface detail it cannot actually see
 SMALL_SHARE = 0.03
 
@@ -25,6 +23,7 @@ NARRATION_PROMPT = """\
 {length_rule}
 - です・ます調だが講釈しない。驚きは形容詞（「驚くべき」「実は奥深い」）ではなく、事実の対比で出す
 - 語尾に「のです」「のでしょう」「ご存知ですか」は使わない
+- 見出し・箇条書き・字数の注記（「（24字）」など）は書かない。話し言葉の本文だけを書く
 {aspect_rule}
 - 写真に見えている特徴を1つ以上、その側面の根拠としてつなげる
 - どの写真の同じ物でも聞ける定番の豆知識は選ばない（例: 電柱は中が空洞、マンホールの蓋が丸いのは落ちないため、鬼瓦は魔除け）。
@@ -47,17 +46,14 @@ NARRATION_PROMPT = """\
    悪い例: 遠くに小さく写ったビルについて「外壁には2種類の石材が使われています」
 5. クイズ・謎解き・推理ゲームのような口調（「さて」「問題です」「答えは」「名探偵」など）や、
    実況のような口調（「おっと」「なんと」「来ました」など）は使わない
-6. 本文のあとに改行して「{heading}」という見出し行を1行だけ置き、その次の行に、
-   次の散歩で別の物にも使える観察のしかたを1文で書く（例: 「〜を見たら、〜に注目すると〜が分かる」）
-   見出し行より後には、その1文以外何も書かない
-7. 写真に写っている人・影・車などの一時的な物には触れない
+6. 写真に写っている人・影・車などの一時的な物には触れない
 {extra_rules}"""
 
 
 # The lines that depend on Google Search. The no-grounding fallback (D-32) swaps them (D-36):
 # without search the model cannot check facts, so the length goes to on-site questions, not claims
 _WITH_SEARCH = {
-    "length_rule": "- 本文は日本語で250〜350字、2〜3段落。段落の間は空行1つ",
+    "length_rule": "- 本文は日本語で200〜350字、2〜3段落。段落の間は空行1つ",
     "aspect_rule": """- 話す側面は1つに絞る。次の順で、上から話せるものを選ぶ
   1. この種類の物に共通する構造・仕組み・決まりごと・作られ方
   2. 1で話せることが乏しければ、その物がつながっている、より大きな仕組みへ一歩だけ広げる
@@ -78,7 +74,7 @@ _WITH_SEARCH = {
     "extra_rules": "",
 }
 _WITHOUT_SEARCH = {
-    "length_rule": "- 本文は日本語で250〜350字、2〜3段落。段落の間は空行1つ",
+    "length_rule": "- 本文は日本語で200〜350字、2〜3段落。段落の間は空行1つ",
     "aspect_rule": """- 話すのは次の3つだけ
   1. 写真で見えるこの物の特徴を2つ、指差すように挙げる
   2. この種類の物が何のためにあるか（役目）を1文で言う
@@ -89,7 +85,7 @@ _WITHOUT_SEARCH = {
     "fact_rule": """   - 今回は Google 検索が使えない。数字・年号・法律や規格の名前・「〜で定められている」のような決まりごとは書かない""",
     # The grounded example teaches era-guessing from an emblem, which was wrong without search
     "hypothesis_example": "「市の紋章に似た形なので、市が管理している設備かもしれません」",
-    "extra_rules": """8. 次の3つは、間違いやすいので書かない
+    "extra_rules": """7. 次の3つは、間違いやすいので書かない
    - 紋章・形・古さ・色から、作られた年代を推測すること
      悪い例:「この校章に似ているので、戦前の建物かもしれません」
    - 「〜が基本です」「〜が決まりです」「〜が標準です」「一般的に〜です」という言い切り
@@ -125,6 +121,5 @@ def build_narration_prompt(
         # every narration evaluation ran with this value
         place="不明",
         texts=readable,
-        heading=TAKEAWAY_HEADING,
         **(_WITH_SEARCH if grounding else _WITHOUT_SEARCH),
     )

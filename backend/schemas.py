@@ -94,9 +94,8 @@ class NarrateSource(BaseModel):
 
 
 class NarrateDone(BaseModel):
-    """SSE `done`: 語りの末尾。takeaway は区切り行の後ろからサーバが切り出す。"""
+    """SSE `done`: 語りの末尾。出典と、Google 検索候補の表示用 HTML。"""
 
-    takeaway: str = Field(min_length=1, description="次の散歩で転用できる観察パターン（1つ）")
     sources: list[NarrateSource] = Field(description="Search grounding の出典")
     search_entry_html: str | None = Field(
         default=None, description="Google 検索候補の表示用 HTML（grounding 利用時に表示する）"

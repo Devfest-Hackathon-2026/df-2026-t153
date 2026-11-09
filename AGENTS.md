@@ -47,9 +47,8 @@ frontend/: app/ components/ lib/（api.ts は /openapi.json から生成した�
 3. 仮説は1つ、ぼかし表現は2回まで
 4. 写真で見えない細部は語らず「現地で見て」の宿題にする
 5. 推理ゲーム調・実況調は禁止
-6. 毎回「次の散歩で転用できる観察パターン」を1つ渡す
-7. 抽選台帳は sure && fixture && whole && salience>=3 のみ。人物・影・一時物は除外
-8. 場所情報は列挙には渡さず、語りにだけ渡す
+6. 抽選台帳は sure && fixture && whole && salience>=3 のみ。人物・影・一時物は除外
+7. 場所情報は列挙には渡さず、語りにだけ渡す
 
 ## コミット
 - 形式: type(scope): 内容（日本語可）。type は feat/fix/docs/chore/refactor
