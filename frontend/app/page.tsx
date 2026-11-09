@@ -58,6 +58,8 @@ const STALL_AFTER_MS = 30_000;
 // The first sentence points at the object (D-30) and is set vertically beside the
 // name; past this length it is not that sentence, so everything stays in the body
 const LEAD_MAX_CHARS = 40;
+// Characters that fit one vertical column of the 160px box (a little under the real 9, to be safe)
+const LEAD_CHARS_PER_COLUMN = 8;
 const STAGE_MESSAGES = {
   1: "写真を読んでいます",
   2: "写っている物を数えています",
@@ -291,12 +293,17 @@ export default function Home() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex h-40 items-start gap-5">
               <h2
-                className="vertical font-display text-[40px] leading-none font-bold tracking-[0.18em]"
+                className="vertical font-display w-10 shrink-0 text-[40px] leading-none font-bold tracking-[0.18em]"
                 data-testid="hero-name"
               >
                 {hero?.name ?? ""}
               </h2>
-              <p className="vertical font-display h-full text-[15px] leading-[1.9] tracking-[0.1em] text-ink-muted">
+              <p
+                className="vertical font-display h-full shrink-0 text-[15px] leading-[1.9] tracking-[0.1em] text-ink-muted"
+                style={{
+                  width: `${Math.ceil(lead.length / LEAD_CHARS_PER_COLUMN) * 1.9}em`,
+                }}
+              >
                 {lead}
               </p>
             </div>

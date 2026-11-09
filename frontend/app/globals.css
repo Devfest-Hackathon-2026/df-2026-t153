@@ -187,18 +187,19 @@ label {
   }
 }
 
-/* Slow zoom on the hero crop while the first words arrive */
+/* Slow settle from a slight zoom on the hero crop while the first words arrive */
 .kenburns {
   /* origin is set inline in viewBox units (the crop's center) */
   transform-box: view-box;
   animation: kenburns 1.5s ease-out both;
 }
 @keyframes kenburns {
+  /* Settles at 1: a final zoom-in would cut the edges of a big subject for good */
   from {
-    transform: scale(1);
+    transform: scale(1.06);
   }
   to {
-    transform: scale(1.06);
+    transform: scale(1);
   }
 }
 

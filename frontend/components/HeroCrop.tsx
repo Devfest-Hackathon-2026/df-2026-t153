@@ -16,10 +16,13 @@ const PAD = 40;
 export default function HeroCrop({ src, box, name }: Props) {
   const [size, setSize] = useState<Size | null>(null);
   const [x1, y1, x2, y2] = box;
-  const cx1 = Math.max(0, x1 - PAD);
-  const cy1 = Math.max(0, y1 - PAD);
-  const cx2 = Math.min(1000, x2 + PAD);
-  const cy2 = Math.min(1000, y2 + PAD);
+  // Not clamped to the photo: a big subject (a shrine hall) reaches the photo's edge, and
+  // the margin must still exist or its frame ends up under the torn edges. The margin
+  // outside the photo shows the paper colour of the figure.
+  const cx1 = x1 - PAD;
+  const cy1 = y1 - PAD;
+  const cx2 = x2 + PAD;
+  const cy2 = y2 + PAD;
 
   // The crop is a viewBox over the full image, so no canvas work is needed
   const view = size
@@ -34,7 +37,7 @@ export default function HeroCrop({ src, box, name }: Props) {
   // Edge to edge: the parent has px-4, so pull out by -mx-4. The name is not
   // repeated here; it stands in vertical type above the photo (D-39)
   return (
-    <figure className="relative -mx-4 overflow-hidden bg-ink">
+    <figure className="relative -mx-4 overflow-hidden bg-cream">
       {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL; only used to learn the natural size */}
       <img
         src={src}
