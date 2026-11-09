@@ -184,7 +184,7 @@ async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Stream:
 
 
 async def _open_with_fallback(
-    jpeg: bytes, prompt: str, first_token_timeout: float
+    jpeg: bytes, prompt: str, fallback_prompt: str, first_token_timeout: float
 ) -> tuple[_Stream, int, bool]:
     """grounding ありで開き、最初のトークンが間に合わなければ grounding なしで開き直す。
 
@@ -206,7 +206,7 @@ async def _open_with_fallback(
     try:
         opened, retries = await _with_retry(
             lambda: asyncio.wait_for(
-                _open_stream(jpeg, prompt, False), FALLBACK_FIRST_TOKEN_TIMEOUT
+                _open_stream(jpeg, fallback_prompt, False), FALLBACK_FIRST_TOKEN_TIMEOUT
             )
         )
     except TimeoutError as e:
@@ -218,14 +218,19 @@ async def _open_with_fallback(
 
 
 async def stream_narration(
-    jpeg: bytes, prompt: str, first_token_timeout: float | None = None
+    jpeg: bytes,
+    prompt: str,
+    first_token_timeout: float | None = None,
+    fallback_prompt: str | None = None,
 ) -> AsyncIterator[str | NarrateDone]:
-    """語りの断片（str）を順に返し、最後に NarrateDone を1つ返す。"""
+    """語りの断片（str）を順に返し、最後に NarrateDone を1つ返す。
+
+    fallback_prompt は grounding なしに切り替えたときに使う（省略時は prompt のまま）。"""
     t0 = time.perf_counter()
     if first_token_timeout is None:
         first_token_timeout = get_settings().narrate_first_token_timeout
     (first, stream), retries, grounded = await _open_with_fallback(
-        jpeg, prompt, first_token_timeout
+        jpeg, prompt, fallback_prompt or prompt, first_token_timeout
     )
     splitter = _TakeawaySplitter()
     sources: dict[str, NarrateSource] = {}

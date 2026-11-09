@@ -31,6 +31,7 @@
 - `pick_id` は `lineup[]` に含まれるものだけ受け付ける
 - `takeaway`：次の散歩で転用できる観察パターン1文。モデルが本文の後に出す区切り行（`### 持ち帰る視点`）以降をサーバが切り出し、delta には流さない
 - `sources`：Search grounding の出典。`uri` は Vertex AI のリダイレクト URL
+- 最初の文字が `NARRATE_FIRST_TOKEN_TIMEOUT`（12 秒）で来なければ grounding なしで呼び直す（D-32）。このときは `sources` が空で、語りは見える特徴・役目と、現地で確かめる点の問いかけだけになる（D-36）
 - `search_entry_html`：Google 検索候補（Search Suggestions）の表示用 HTML（`searchEntryPoint.renderedContent` をそのまま）。Search grounding を使った応答では**表示が必須**（"you must display the Search Suggestions in production"）。改変せず、応答と同じ幅で、応答が見えている間は出し続ける。タップは検索結果ページへ直行させる。フロントは sandbox 付き iframe で描画（`components/SearchSuggestions.tsx`、D-26）。要件：https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-search-suggestions
 - GPS は語りのプロンプトにだけ渡す
 - `meta.place`：撮影地点の町名（例：西新宿）。GPS が無い・町名が引けないときは null（D-37）
