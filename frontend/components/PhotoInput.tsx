@@ -63,14 +63,16 @@ export default function PhotoInput({ disabled, compact, onSelect }: Props) {
 
   return (
     <label
-      className={`flex flex-col items-center justify-center gap-3 border border-dashed px-4 py-12 text-center ${
+      className={`flex flex-col items-center justify-center gap-3 border px-4 py-12 text-center ${
         disabled
           ? "border-line text-ink-muted"
-          : "cursor-pointer border-ink/50 text-ink active:bg-ink/5"
+          : "cursor-pointer border-ink text-ink active:bg-ink/5"
       }`}
     >
       <CameraIcon className="h-8 w-8" />
-      <span className="font-bold">写真を撮る・選ぶ</span>
+      <span className="font-display text-lg tracking-[0.1em]">
+        写真を撮る・選ぶ
+      </span>
       <span className="text-xs text-ink-muted">
         散歩中の1枚。看板より、見慣れた物を
       </span>

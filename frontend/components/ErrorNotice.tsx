@@ -6,6 +6,7 @@ type Props = {
   retryLabel?: string;
 };
 
+// A rule above and below, like a notice pinned to the page: no coloured bar
 export default function ErrorNotice({
   error,
   onRetry,
@@ -13,17 +14,17 @@ export default function ErrorNotice({
 }: Props) {
   return (
     <div
-      className="enter space-y-2 border-l-2 border-mark pl-4"
+      className="enter space-y-2 border-t border-b border-mark py-3"
       role="alert"
       data-testid="error"
     >
-      <p className="font-bold text-mark">{error.title}</p>
+      <p className="font-display font-bold text-mark">{error.title}</p>
       <p className="text-sm text-ink">{error.action}</p>
       {onRetry && error.retryable && (
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-full border border-ink/60 px-4 py-1 text-sm text-ink active:bg-ink/5"
+          className="font-display border border-indigo px-4 py-1.5 text-sm text-indigo active:bg-indigo/10"
         >
           {retryLabel}
         </button>

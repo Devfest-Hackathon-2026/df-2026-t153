@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans_JP, Noto_Serif_JP } from "next/font/google";
+import { Noto_Sans_JP, Noto_Serif_JP, Shippori_Mincho } from "next/font/google";
 import "./globals.css";
 
 // Self-hosted at build time by next/font; no request to Google Fonts at runtime.
-// Sans is the interface; Serif is the voice (narration, hint, takeaway).
+// Sans is the interface; Serif is the voice (narration, hint); Shippori is the
+// brush-like display face for names and labels (D-39).
 const notoSansJP = Noto_Sans_JP({
   subsets: ["latin"],
   display: "swap",
@@ -14,6 +15,12 @@ const notoSerifJP = Noto_Serif_JP({
   weight: ["400", "700"],
   display: "swap",
   variable: "--font-noto-serif-jp",
+});
+const shipporiMincho = Shippori_Mincho({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-shippori-mincho",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f5ef",
+  themeColor: "#f2ecdf",
   width: "device-width",
   initialScale: 1,
 };
@@ -37,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${notoSansJP.variable} ${notoSerifJP.variable}`}
+      className={`${notoSansJP.variable} ${notoSerifJP.variable} ${shipporiMincho.variable}`}
     >
       <body className="min-h-dvh antialiased">{children}</body>
     </html>

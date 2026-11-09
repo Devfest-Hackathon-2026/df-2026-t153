@@ -7,18 +7,18 @@
     "Yu Gothic", sans-serif;
   --font-serif:
     var(--font-noto-serif-jp), "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --color-paper: #f7f5ef;
-  --color-card: #ffffff;
-  --color-ink: #1f2a24;
-  --color-ink-muted: #6b7570;
-  --color-line: #e6e2d8;
+  --font-display:
+    var(--font-shippori-mincho), var(--font-noto-serif-jp),
+    "Hiragino Mincho ProN", serif;
+  /* 和紙と墨 (D-39): unbleached paper, sumi ink, vermilion seal, indigo for links */
+  --color-paper: #f2ecdf;
+  --color-ink: #2a2825;
+  --color-ink-muted: #6b655b;
+  --color-line: #d9d0bc;
   --color-moss: #3f6b4f;
-  --color-moss-deep: #2f5240;
-  --color-moss-soft: #e9f0ea;
-  --color-mark: #d9412b;
-  --color-mark-soft: #fbe9e6;
-  --shadow-card:
-    0 1px 2px rgb(31 42 36 / 0.06), 0 8px 24px -16px rgb(31 42 36 / 0.25);
+  --color-mark: #b23a2e;
+  --color-indigo: #35546a;
+  --color-cream: #e9d6b4;
 }
 
 html {
@@ -29,9 +29,66 @@ html {
 }
 
 body {
-  background: var(--color-paper);
+  /* Faint vertical fibres over the paper colour: washi, not a flat fill */
+  background-color: var(--color-paper);
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(60 50 30 / 0.035) 0px,
+    rgb(60 50 30 / 0.035) 1px,
+    transparent 1px,
+    transparent 7px
+  );
   color: var(--color-ink);
   font-feature-settings: "palt";
+}
+
+/* Vertical text for the name and the lead sentence; columns grow leftwards */
+.vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Torn-paper edges on the photo: a paper-coloured strip with a ragged clip */
+.torn-top,
+.torn-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: var(--color-paper);
+  pointer-events: none;
+}
+.torn-top {
+  top: 0;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 30%,
+    92% 70%,
+    80% 35%,
+    66% 80%,
+    52% 40%,
+    38% 75%,
+    24% 30%,
+    12% 65%,
+    0 35%
+  );
+}
+.torn-bottom {
+  bottom: 0;
+  clip-path: polygon(
+    0 100%,
+    100% 100%,
+    100% 60%,
+    88% 25%,
+    74% 70%,
+    60% 20%,
+    46% 65%,
+    30% 30%,
+    16% 75%,
+    6% 40%,
+    0 70%
+  );
 }
 
 button,

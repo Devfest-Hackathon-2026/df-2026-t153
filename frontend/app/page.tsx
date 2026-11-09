@@ -14,9 +14,8 @@ import PhotoInput from "@/components/PhotoInput";
 import ScanOverlay from "@/components/ScanOverlay";
 import SearchSuggestions from "@/components/SearchSuggestions";
 import Sources from "@/components/Sources";
-import Takeaway from "@/components/Takeaway";
-import TakeawayHistory from "@/components/TakeawayHistory";
 import { analyze, type AnalyzeResponse } from "@/lib/api";
+import { kanjiDate } from "@/lib/date";
 import {
   describeError,
   describeStatus,
@@ -29,7 +28,6 @@ import {
   type NarrateMeta,
   type NarrateSubscription,
 } from "@/lib/narrate";
-import { saveTakeaway } from "@/lib/takeaways";
 
 type AnalyzeState =
   | { phase: "idle" }
@@ -57,6 +55,9 @@ const SLOW_AFTER_S = 25;
 const STUCK_AFTER_S = 60;
 // No narration text for this long -> offer a retry while the stream stays open
 const STALL_AFTER_MS = 30_000;
+// The first sentence points at the object (D-30) and is set vertically beside the
+// name; past this length it is not that sentence, so everything stays in the body
+const LEAD_MAX_CHARS = 40;
 const STAGE_MESSAGES = {
   1: "写真を読んでいます",
   2: "写っている物を数えています",
@@ -71,7 +72,23 @@ function stageMessage(stage: 1 | 2 | 3, elapsed: number): string {
   return STAGE_MESSAGES[2];
 }
 
+// Split the narration into the pointing first sentence and the rest
+function splitLead(text: string): { lead: string; body: string } {
+  const end = text.indexOf("。");
+  if (end >= 0 && end < LEAD_MAX_CHARS) {
+    return {
+      lead: text.slice(0, end + 1),
+      body: text.slice(end + 1).replace(/^\n+/, ""),
+    };
+  }
+  // Still streaming the first sentence
+  if (end < 0 && text.length < LEAD_MAX_CHARS) return { lead: text, body: "" };
+  return { lead: "", body: text };
+}
+
 const rule = "border-t border-line";
+const BUTTON =
+  "font-display border border-indigo px-4 py-1.5 text-sm text-indigo active:bg-indigo/10";
 
 export default function Home() {
   const [analysis, setAnalysis] = useState<AnalyzeState>({ phase: "idle" });
@@ -88,7 +105,6 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   // Kept for "もう一度" after a failed analyze
   const lastFileRef = useRef<File | null>(null);
-  const metaRef = useRef<NarrateMeta | null>(null);
 
   useEffect(() => {
     if (analysis.phase !== "loading") return;
@@ -118,27 +134,18 @@ export default function Home() {
     setSelectedId(pickId);
     setStalled(false);
     setStory({ phase: "streaming", meta: null, text: "" });
-    metaRef.current = null;
     subRef.current = narrate(sessionId, pickId, {
-      onMeta: (meta) => {
-        metaRef.current = meta;
-        setStory({ phase: "streaming", meta, text: "" });
-      },
+      onMeta: (meta) => setStory({ phase: "streaming", meta, text: "" }),
       onDelta: (chunk) =>
         setStory((s) =>
           s.phase === "streaming" ? { ...s, text: s.text + chunk } : s,
         ),
-      onDone: (done) => {
-        saveTakeaway({
-          text: done.takeaway,
-          object_name: metaRef.current?.name ?? "",
-        });
+      onDone: (done) =>
         setStory((s) =>
           s.phase === "streaming"
             ? { phase: "done", meta: s.meta, text: s.text, done }
             : s,
-        );
-      },
+        ),
       onError: (err) =>
         setStory((s) =>
           s.phase === "streaming"
@@ -224,7 +231,7 @@ export default function Home() {
 
   const result = analysis.phase === "done" ? analysis.result : null;
 
-  // Once a story starts, bring the hero crop to the top of the viewport
+  // Once a story starts, bring the name and the hero crop to the top of the viewport
   const storyView = story.phase !== "idle";
   useEffect(() => {
     if (storyView)
@@ -249,9 +256,9 @@ export default function Home() {
       : null;
 
   const header = (
-    <header className="flex items-end justify-between gap-3">
+    <header className="flex items-start justify-between gap-3">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">SanpoLab</h1>
+        <h1 className="font-display text-xl tracking-[0.12em]">SanpoLab</h1>
         {/* The tagline only introduces; once a photo is in, the photo speaks */}
         {!preview && (
           <p className="mt-1 text-sm text-ink-muted">
@@ -269,27 +276,53 @@ export default function Home() {
     </header>
   );
 
-  // ---- Story view: hero -> narration -> takeaway -> sources -> chips -> collapsed photo ----
+  // ---- Story view: name -> hero -> narration -> sources -> list -> collapsed photo ----
   if (storyView && result && preview) {
+    const { lead, body } = splitLead(story.text);
+    const dateLine = [kanjiDate(new Date()), hero?.place]
+      .filter(Boolean)
+      .join("　");
     return (
       <main className="mx-auto max-w-md px-4 py-5">
         {header}
-        <div ref={heroRef} className="mt-4 scroll-mt-2" data-section="hero">
-          {hero ? (
-            <HeroCrop
-              src={preview}
-              box={hero.box}
-              name={hero.name}
-              place={hero.place}
-            />
-          ) : (
-            <div className="-mx-4 h-48 animate-pulse bg-line" aria-hidden />
-          )}
+        <div ref={heroRef} className="mt-5 scroll-mt-2" data-section="hero">
+          {/* The name stands vertically, with the pointing first sentence beside it
+              and the seal in the corner: a page from a walker's notebook (D-39) */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex h-40 items-start gap-5">
+              <h2
+                className="vertical font-display text-[40px] leading-none font-bold tracking-[0.18em]"
+                data-testid="hero-name"
+              >
+                {hero?.name ?? ""}
+              </h2>
+              <p className="vertical font-display h-full text-[15px] leading-[1.9] tracking-[0.1em] text-ink-muted">
+                {lead}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-3">
+              <span
+                className="vertical font-display flex h-11 w-11 -rotate-3 items-center justify-center border-2 border-mark text-[15px] leading-none font-bold text-mark"
+                aria-label="今日の主役"
+              >
+                主役
+              </span>
+              <span className="font-display text-xs tracking-[0.12em] text-ink-muted">
+                {dateLine}
+              </span>
+            </div>
+          </div>
+          <div className="mt-5">
+            {hero ? (
+              <HeroCrop src={preview} box={hero.box} name={hero.name} />
+            ) : (
+              <div className="-mx-4 h-48 animate-pulse bg-line" aria-hidden />
+            )}
+          </div>
         </div>
 
-        {/* No heading: the voice starts right under the photo */}
         <section className="mt-6 space-y-5" data-section="story">
-          <Narration text={story.text} streaming={streaming} />
+          <Narration text={body} streaming={streaming} />
           {streaming && stalled && selectedId && (
             <div
               className="enter flex items-center gap-3 text-sm text-ink-muted"
@@ -299,7 +332,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => startStory(result.session_id, selectedId)}
-                className="rounded-full border border-ink/60 px-4 py-1 text-ink active:bg-ink/5"
+                className={BUTTON}
               >
                 もう一度
               </button>
@@ -307,13 +340,6 @@ export default function Home() {
           )}
           {story.phase === "done" && (
             <>
-              <div
-                className="enter pt-1"
-                style={{ transitionDelay: "300ms" }}
-                data-section="takeaway"
-              >
-                <Takeaway text={story.done.takeaway} />
-              </div>
               <Sources sources={story.done.sources} />
               {story.done.search_entry_html && (
                 <SearchSuggestions html={story.done.search_entry_html} />
@@ -342,23 +368,27 @@ export default function Home() {
           </section>
         )}
 
-        <section
-          className="mt-6 rounded-2xl border border-line bg-card shadow-card"
-          data-section="photo"
-        >
+        <section className={`${rule} mt-6 border-b`} data-section="photo">
           <button
             type="button"
             aria-expanded={photoOpen}
             onClick={() => setPhotoOpen((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm"
+            className="font-display flex w-full items-center justify-between py-3 text-left text-sm tracking-[0.08em]"
           >
             元の写真と見つけた物
-            <span aria-hidden className="text-ink-muted">
-              {photoOpen ? "▲" : "▼"}
-            </span>
+            <svg
+              viewBox="0 0 16 16"
+              className={`h-4 w-4 text-ink-muted transition-transform ${photoOpen ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden
+            >
+              <path d="M3 6l5 5 5-5" />
+            </svg>
           </button>
           {photoOpen && (
-            <div className="space-y-3 px-4 pb-4">
+            <div className="space-y-3 pb-4">
               <BoxOverlay
                 src={preview}
                 objects={result.objects}
@@ -390,9 +420,8 @@ export default function Home() {
     <main className="mx-auto max-w-md px-4 py-5">
       {header}
       {!preview && (
-        <div className="mt-8 space-y-8">
+        <div className="mt-8">
           <PhotoInput onSelect={handleSelectPhoto} />
-          <TakeawayHistory />
         </div>
       )}
 
@@ -411,11 +440,7 @@ export default function Home() {
       )}
       {waiting && elapsed >= STUCK_AFTER_S && (
         <div className="enter mt-3 text-center">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="rounded-full border border-ink/60 px-5 py-1.5 text-sm text-ink active:bg-ink/5"
-          >
+          <button type="button" onClick={handleCancel} className={BUTTON}>
             中断する
           </button>
         </div>
@@ -449,6 +474,8 @@ export default function Home() {
             )}
             {(stage === 1 || stage === 2) && <ScanOverlay stage={stage} />}
           </div>
+          <span className="torn-top" aria-hidden />
+          <span className="torn-bottom" aria-hidden />
         </div>
       )}
 

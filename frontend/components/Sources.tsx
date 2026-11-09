@@ -24,7 +24,7 @@ export default function Sources({ sources }: Props) {
   }
   return (
     <section data-testid="sources">
-      <h3 className="mb-1 text-xs font-bold tracking-wide text-ink-muted">
+      <h3 className="font-display mb-1 text-xs tracking-[0.2em] text-ink-muted">
         Google 検索で確認した出典
       </h3>
       <ul className="space-y-1 text-sm">
@@ -35,7 +35,7 @@ export default function Sources({ sources }: Props) {
                 href={s.uri}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-ink underline underline-offset-4"
+                className="text-indigo underline underline-offset-4"
               >
                 {s.title || s.uri}
               </a>

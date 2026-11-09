@@ -8,7 +8,7 @@ type Props = {
   onSelect: (id: string) => void;
 };
 
-// One row of chips; the selected one is the only red thing besides the box on the photo
+// Names underlined in ink, like entries in a list; the chosen one is in vermilion
 export default function Lineup({ items, selectedId, onSelect }: Props) {
   if (items.length === 0) {
     return (
@@ -19,32 +19,40 @@ export default function Lineup({ items, selectedId, onSelect }: Props) {
   }
 
   return (
-    <ul
-      className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1"
-      role="listbox"
-      aria-label="ほかの候補"
-    >
-      {items.map((o) => {
-        const selected = o.id === selectedId;
-        return (
-          <li key={o.id} className="shrink-0">
-            <button
-              type="button"
-              data-testid="lineup-chip"
-              role="option"
-              aria-selected={selected}
-              onClick={() => onSelect(o.id)}
-              className={`rounded-full border px-4 py-1.5 text-sm transition-[colors,transform] active:scale-95 ${
-                selected
-                  ? "border-mark bg-mark font-bold text-white"
-                  : "border-ink/60 text-ink active:bg-ink/5"
-              }`}
-            >
-              {o.name}
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex items-baseline gap-4">
+      <span
+        className="shrink-0 text-[11px] tracking-[0.2em] text-ink-muted"
+        aria-hidden
+      >
+        ほかに
+      </span>
+      <ul
+        className="no-scrollbar flex gap-5 overflow-x-auto"
+        role="listbox"
+        aria-label="ほかの候補"
+      >
+        {items.map((o) => {
+          const selected = o.id === selectedId;
+          return (
+            <li key={o.id} className="shrink-0">
+              <button
+                type="button"
+                data-testid="lineup-chip"
+                role="option"
+                aria-selected={selected}
+                onClick={() => onSelect(o.id)}
+                className={`font-display border-b px-0.5 py-2 text-[15px] transition-colors ${
+                  selected
+                    ? "border-mark font-bold text-mark"
+                    : "border-ink text-ink active:text-ink-muted"
+                }`}
+              >
+                {o.name}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
