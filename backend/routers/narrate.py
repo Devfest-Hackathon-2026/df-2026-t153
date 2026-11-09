@@ -45,10 +45,8 @@ async def narrate(session_id: str, pick_id: str) -> AsyncIterator[ServerSentEven
         data=NarrateMeta(pick_id=pick.id, name=pick.name, box=pick.box, place=session.get("place")),
     )
     texts = [InventoryText.model_validate(t) for t in session["texts"]]
-    prompt = build_narration_prompt(session["scene"], pick, texts, session.get("gps"))
-    fallback_prompt = build_narration_prompt(
-        session["scene"], pick, texts, session.get("gps"), grounding=False
-    )
+    prompt = build_narration_prompt(session["scene"], pick, texts)
+    fallback_prompt = build_narration_prompt(session["scene"], pick, texts, grounding=False)
     try:
         async for item in gemini.stream_narration(jpeg, prompt, fallback_prompt=fallback_prompt):
             if isinstance(item, NarrateDone):

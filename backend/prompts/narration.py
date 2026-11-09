@@ -112,10 +112,8 @@ def build_narration_prompt(
     scene: str,
     pick: InventoryObject,
     texts: list[InventoryText],
-    gps: dict[str, float] | None,
     grounding: bool = True,
 ) -> str:
-    place = f"緯度 {gps['lat']:.4f}, 経度 {gps['lon']:.4f}" if gps else "不明"
     readable = "、".join(f"「{t.content}」" for t in texts) or "なし"
     return NARRATION_PROMPT.format(
         name=pick.name,
@@ -123,7 +121,9 @@ def build_narration_prompt(
         size=size_note(pick.box),
         detail=pick.detail,
         scene=scene,
-        place=place,
+        # D-42: coordinates here kept the first token 60-70 s away (vs 7-15 s without);
+        # every narration evaluation ran with this value
+        place="不明",
         texts=readable,
         heading=TAKEAWAY_HEADING,
         **(_WITH_SEARCH if grounding else _WITHOUT_SEARCH),
