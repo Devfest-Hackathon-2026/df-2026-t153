@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from typing import Annotated
@@ -5,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from schemas import AnalyzeResponse
-from services import gemini, image, lineup, sessions, storage
+from services import gemini, geocode, image, lineup, sessions, storage
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -13,6 +14,10 @@ log = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 # 2 decimals is about 1 km: enough for the narration's sense of place, not a home address
 GPS_DECIMALS = 2
+
+
+async def _place(gps: tuple[float, float] | None) -> str | None:
+    return await geocode.town_name(*gps) if gps else None
 
 
 @router.post("/api/analyze", response_model=AnalyzeResponse)
@@ -29,7 +34,11 @@ async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> Ana
 
     session_id = uuid.uuid4().hex
     try:
-        inv = await gemini.list_inventory(prepared.jpeg)
+        # The town lookup (~2 s) runs alongside the inventory call (~10 s), so it adds no wait.
+        # It gets the unrounded point so the town is right; only the town name is stored (D-37)
+        inv, place = await asyncio.gather(
+            gemini.list_inventory(prepared.jpeg), _place(prepared.gps)
+        )
     except gemini.GeminiError as e:
         status = 503 if isinstance(e, gemini.GeminiUnavailableError) else 502
         log.error(
@@ -49,7 +58,7 @@ async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> Ana
     )
     await sessions.get_session_store().save(
         session_id,
-        {**inv.model_dump(), "lineup": ids, "photo_uri": photo_uri, "gps": gps},
+        {**inv.model_dump(), "lineup": ids, "photo_uri": photo_uri, "gps": gps, "place": place},
     )
     log.info(
         "analyzed",
@@ -59,6 +68,7 @@ async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> Ana
                 "objects": len(inv.objects),
                 "lineup": len(ids),
                 "has_gps": gps is not None,
+                "has_place": place is not None,
             }
         },
     )

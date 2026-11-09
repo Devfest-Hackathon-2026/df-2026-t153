@@ -65,3 +65,6 @@ def setup_logging() -> None:
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(logging.INFO)
+    # httpx2 logs every request URL at INFO; the reverse geocoder's URL carries the unrounded
+    # photo location, which D-34 keeps out of storage (D-37)
+    logging.getLogger("httpx2").setLevel(logging.WARNING)

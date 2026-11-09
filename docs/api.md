@@ -15,6 +15,7 @@
 - `texts[]`: `{content, where}`。Gemini が texts に入れ忘れた文字は、サーバが objects[].detail から補う（where は object の name）
 - `lineup[]`: 抽選候補の `objects[].id`（`sure && kind==fixture && whole && salience>=3` を `(potential, salience)` 降順で最大3件）。1件も無いときだけ `whole` を外して選び直す（D-11）。それでも無ければ空配列
 - EXIF GPS はレスポンスにも列挙プロンプトにも含めず、小数第 2 位（約 1 km）に丸めて session にだけ保存する
+- GPS があれば、丸める前の座標で国土地理院の逆ジオコーダから町名を引き、丁目を落として session の `place` に保存する（D-37）。座標そのものは送るだけで残さない
 
 ### /api/narrate の中身
 
@@ -32,6 +33,7 @@
 - `sources`：Search grounding の出典。`uri` は Vertex AI のリダイレクト URL
 - `search_entry_html`：Google 検索候補（Search Suggestions）の表示用 HTML（`searchEntryPoint.renderedContent` をそのまま）。Search grounding を使った応答では**表示が必須**（"you must display the Search Suggestions in production"）。改変せず、応答と同じ幅で、応答が見えている間は出し続ける。タップは検索結果ページへ直行させる。フロントは sandbox 付き iframe で描画（`components/SearchSuggestions.tsx`、D-26）。要件：https://docs.cloud.google.com/vertex-ai/generative-ai/docs/grounding/grounding-search-suggestions
 - GPS は語りのプロンプトにだけ渡す
+- `meta.place`：撮影地点の町名（例：西新宿）。GPS が無い・町名が引けないときは null（D-37）
 
 ### /api/feedback の中身
 
