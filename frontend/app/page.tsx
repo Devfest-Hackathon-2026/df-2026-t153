@@ -495,7 +495,7 @@ export default function Home() {
       {hint &&
         (waiting || revealing || (result && result.lineup.length === 0)) && (
           <div className="mt-6">
-            <HintCard text={hint} />
+            <HintCard text={hint} onNext={() => setHint((h) => pickHint(h))} />
           </div>
         )}
     </main>
