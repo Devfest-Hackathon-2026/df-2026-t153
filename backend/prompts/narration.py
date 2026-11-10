@@ -50,7 +50,7 @@ NARRATION_PROMPT = """\
 {extra_rules}"""
 
 
-# The lines that depend on Google Search. The no-grounding fallback (D-32) swaps them (D-36):
+# The lines that depend on Google Search. The no-grounding fallback (D-32) swaps them (D-35):
 # without search the model cannot check facts, so the length goes to on-site questions, not claims
 _WITH_SEARCH = {
     "length_rule": "- 本文は日本語で200〜350字、2〜3段落。段落の間は空行1つ",
@@ -61,7 +61,7 @@ _WITH_SEARCH = {
      広げるのは一段だけ。最後は写真に見えている特徴に戻って結ぶ
   3. 1も2も難しければ、この種類の物の起源や移り変わり。Google 検索で出典が見つかった場合だけ話す。
      今の姿のどこにその名残があるかに結びつける""",
-    # D-38: with the tool attached the model still skipped search in some runs and asserted
+    # D-37: with the tool attached the model still skipped search in some runs and asserted
     # facts unsourced; the explicit line made every evaluated run search
     "search_rule": """  定番を避けた話を選ぶときは、先に Google 検索でこの種類の物の構造・作られ方・規格を調べ、検索結果に出てきた事実から1つ選ぶ。検索結果に出てこない数字・年号・法律や規格の名前は書かない
   法律や規格で定められていることを主題にするのは、構造・仕組み・作られ方で話せることが見つからないときだけにする
@@ -117,7 +117,7 @@ def build_narration_prompt(
         size=size_note(pick.box),
         detail=pick.detail,
         scene=scene,
-        # D-42: coordinates here kept the first token 60-70 s away (vs 7-15 s without);
+        # D-41: coordinates here kept the first token 60-70 s away (vs 7-15 s without);
         # every narration evaluation ran with this value
         place="不明",
         texts=readable,

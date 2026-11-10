@@ -5,7 +5,7 @@ import httpx2
 
 log = logging.getLogger(__name__)
 
-# D-37: GSI's reverse geocoder needs no API key and returns the town name for a point in Japan
+# D-36: GSI's reverse geocoder needs no API key and returns the town name for a point in Japan
 GSI_REVERSE_URL = "https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress"
 TIMEOUT = 3.0
 # A 丁目 narrows the place to a few hundred metres; the town alone keeps D-34's ~1 km grain

@@ -45,5 +45,5 @@
 | Noto Sans JP | 本文フォント（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Sans+JP | SIL Open Font License 1.1 | 確認済（2026-11-08、https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE）|
 | Noto Serif JP | 語り・雑学の本文（next/font/google でビルド時に取得し自己ホスト） | https://fonts.google.com/noto/specimen/Noto+Serif+JP | SIL Open Font License 1.1 | 確認済（2026-11-08、https://github.com/notofonts/noto-cjk/blob/main/Serif/LICENSE）|
 | アプリアイコン「散」 | PWA / favicon（`frontend/public/icons/`, `app/icon.svg`） | 自作（このリポジトリ） | リポジトリと同じ | 確認済 |
-| 国土地理院 逆ジオコーダ（LonLatToAddress） | 撮影地点の町名（`backend/services/geocode.py`、D-37） | https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress | 未確認（公式の利用規約ページが見つからない） | 未確認（2026-11-09。デモ期間のみの利用） |
-| Shippori Mincho | 主役の名前・見出し・ボタンの書体（next/font/google でビルド時に取得し自己ホスト、D-39） | https://fonts.google.com/specimen/Shippori+Mincho | SIL Open Font License 1.1 | 確認済（2026-11-09、https://github.com/fontdasu/ShipporiMincho/blob/master/OFL.txt）|
+| 国土地理院 逆ジオコーダ（LonLatToAddress） | 撮影地点の町名（`backend/services/geocode.py`、D-36） | https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress | 未確認（公式の利用規約ページが見つからない） | 未確認（2026-11-09。デモ期間のみの利用） |
+| Shippori Mincho | 主役の名前・見出し・ボタンの書体（next/font/google でビルド時に取得し自己ホスト、D-38） | https://fonts.google.com/specimen/Shippori+Mincho | SIL Open Font License 1.1 | 確認済（2026-11-09、https://github.com/fontdasu/ShipporiMincho/blob/master/OFL.txt）|

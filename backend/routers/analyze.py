@@ -34,7 +34,7 @@ async def analyze(image_file: Annotated[UploadFile, File(alias="image")]) -> Ana
     try:
         # The town lookup (~2 s) runs alongside the inventory call (~10 s), so it adds no wait.
         # It gets the unrounded point so the town is right; the point itself is never stored,
-        # since nothing reads it once the narration stopped taking it (D-37, D-42)
+        # since nothing reads it once the narration stopped taking it (D-36, D-41)
         inv, place = await asyncio.gather(
             gemini.list_inventory(prepared.jpeg), _place(prepared.gps)
         )
