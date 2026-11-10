@@ -388,6 +388,12 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {hero?.place && (
+          <p className="mt-4 text-center text-xs text-ink-muted">
+            町名の出典：国土地理院ウェブサイト
+          </p>
+        )}
       </main>
     );
   }
