@@ -247,3 +247,16 @@ yarn-error.log*
 Thumbs.db
 
 CLAUDE.md
+
+# ---- Added from the organizer's template (secrets) ----
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+*.p12
+service-account*.json
+credentials*.json
+google-services.json
+GoogleService-Info.plist
+.wrangler/
