@@ -192,7 +192,7 @@
 
 ## D-22 backend のデプロイ構成（2026-11-08 / ）
 - 候補：実行アカウント (a) 専用 SA `sanpolab-api`（aiplatform.user・datastore.user・バケットの objectAdmin だけ） (b) 既定の compute SA（editor）／最低台数 (a) 0 (b) 1／デプロイ方法 `gcloud run deploy --source`（Cloud Build で Dockerfile をビルド）
-- 選択：実行アカウントは (a) を目標に、owner が権限を付けるまでは (b) で仮に上げる（`SERVICE_ACCOUNT` で切り替え）。最低台数は 0（デモ撮影・審査期間だけ 1 にする）。リージョン asia-northeast1、メモリ 1GiB（`scripts/deploy-backend.sh`）。公開（invoker の IAM チェック無効化）は owner が1回だけ行う
+- 選択：実行アカウントは (a) を目標に、owner が権限を付けるまでは (b) で仮に上げる（`SERVICE_ACCOUNT` で切り替え）。最低台数は 0（デモ撮影・審査期間だけ 1 にする）。リージョン asia-northeast1、メモリ 1GiB（`scripts/deploy-backend.sh`）。公開（invoker の IAM チェック無効化）は owner が1回だけ行う。2026-11-10 時点で専用 SA（sanpolab-api@sanpolab.iam.gserviceaccount.com）で稼働していることを `gcloud run services describe` で確認
 - 理由：今は既定のアカウントで動かして問題を先に見つけ、あとで切り替える。また、最低台数を0にすれば、使わない間は課金されない。初回が20秒ほど遅くなるのは、デモと審査の期間だけ1にすれば避けられる
 - 捨てた理由：(b) だけで運用するとプロジェクト全体の編集権限を持つので広すぎる。最低台数 1 は使わない間も課金される。editor では SA への権限付与も公開設定（`--allow-unauthenticated`・`--no-invoker-iam-check`）も失敗した
 - 見直し条件：
@@ -227,10 +227,10 @@
 
 ## D-27 デモ・審査期間（11/10〜11/14）の Cloud Run 最低インスタンス数（2026-11-08 / ）
 - 候補：(a) `MIN_INSTANCES=1` にして初回の起動待ち（約 20 秒）を無くす (b) 0 のまま（使わない間は無料。最初の 1 回だけ遅い） (c) 1 にするのはデモ撮影の時間帯だけ
-- 選択：
-- 理由：
-- 捨てた理由：
-- 見直し条件：
+- 選択：(a)。2026-11-10 に `gcloud run services update sanpolab-api --min-instances 1` で反映（リビジョン sanpolab-api-00012）。Regional Day（11/14）の後に 0 へ戻す
+- 理由：審査員が最初に開いたときにできる限り待たせたくない。予測される費用は5日で約330円と小さい
+- 捨てた理由：(b) 審査員が開いた最初の1回が約20秒の起動待ちになり、待機中の表示の途中で離脱されうる (c) 審査は 11/11〜13 の事前審査で、いつ開かれるか分からないため時間帯を絞れない
+- 見直し条件：11/14 の Regional Day が終わったら 0 に戻す。クレジット残高が見積もりより早く減ったときも戻す
 - コスト概算（Cloud Billing Catalog API で取得した asia-northeast1 の単価、2026-11-08、USD）：
   - 最低インスタンスの待機中：CPU $0.0000025/vCPU 秒、メモリ $0.0000025/GiB 秒（SKU「Services Min Instance CPU / Memory (Request-based billing)」）
   - リクエスト処理中：CPU $0.000024/vCPU 秒、メモリ $0.0000025/GiB 秒、リクエスト $0.40/100 万件（200 万件まで無料）
