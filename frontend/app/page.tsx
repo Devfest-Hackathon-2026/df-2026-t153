@@ -55,11 +55,6 @@ const SLOW_AFTER_S = 25;
 const STUCK_AFTER_S = 60;
 // No narration text for this long -> offer a retry while the stream stays open
 const STALL_AFTER_MS = 30_000;
-// The first sentence points at the object (D-30) and is set vertically beside the
-// name; past this length it is not that sentence, so everything stays in the body
-const LEAD_MAX_CHARS = 40;
-// Characters that fit one vertical column of the 160px box (a little under the real 9, to be safe)
-const LEAD_CHARS_PER_COLUMN = 8;
 const STAGE_MESSAGES = {
   1: "写真を読んでいます",
   2: "写っている物を数えています",
@@ -72,20 +67,6 @@ function stageMessage(stage: 1 | 2 | 3, elapsed: number): string {
     return "かなり時間がかかっています。電波の良い所でもう一度お試しください";
   if (elapsed >= SLOW_AFTER_S) return "時間がかかっています";
   return STAGE_MESSAGES[2];
-}
-
-// Split the narration into the pointing first sentence and the rest
-function splitLead(text: string): { lead: string; body: string } {
-  const end = text.indexOf("。");
-  if (end >= 0 && end < LEAD_MAX_CHARS) {
-    return {
-      lead: text.slice(0, end + 1),
-      body: text.slice(end + 1).replace(/^\n+/, ""),
-    };
-  }
-  // Still streaming the first sentence
-  if (end < 0 && text.length < LEAD_MAX_CHARS) return { lead: text, body: "" };
-  return { lead: "", body: text };
 }
 
 const rule = "border-t border-line";
@@ -280,7 +261,6 @@ export default function Home() {
 
   // ---- Story view: name -> hero -> narration -> sources -> list -> collapsed photo ----
   if (storyView && result && preview) {
-    const { lead, body } = splitLead(story.text);
     const dateLine = [kanjiDate(new Date()), hero?.place]
       .filter(Boolean)
       .join("　");
@@ -288,33 +268,23 @@ export default function Home() {
       <main className="mx-auto max-w-md px-4 py-5">
         {header}
         <div ref={heroRef} className="mt-5 scroll-mt-2" data-section="hero">
-          {/* The name stands vertically, with the pointing first sentence beside it
-              and the seal in the corner: a page from a walker's notebook (D-39) */}
+          {/* Horizontal fallback: the name in Mincho with the seal in the corner; the
+              first sentence stays at the top of the narration */}
           <div className="flex items-start justify-between gap-4">
-            <div className="flex h-40 items-start gap-5">
-              <h2
-                className="vertical font-display w-10 shrink-0 text-[40px] leading-none font-bold tracking-[0.18em]"
-                data-testid="hero-name"
-              >
-                {hero?.name ?? ""}
-              </h2>
-              <p
-                className="vertical font-display h-full shrink-0 text-[15px] leading-[1.9] tracking-[0.1em] text-ink-muted"
-                style={{
-                  width: `${Math.ceil(lead.length / LEAD_CHARS_PER_COLUMN) * 1.9}em`,
-                }}
-              >
-                {lead}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-3">
+            <h2
+              className="font-display text-[32px] leading-tight font-bold tracking-[0.08em]"
+              data-testid="hero-name"
+            >
+              {hero?.name ?? ""}
+            </h2>
+            <div className="flex shrink-0 flex-col items-end gap-3">
               <span
                 className="vertical font-display flex h-11 w-11 -rotate-3 items-center justify-center border-2 border-mark text-[15px] leading-none font-bold text-mark"
                 aria-label="今日の主役"
               >
                 主役
               </span>
-              <span className="font-display text-xs tracking-[0.12em] text-ink-muted">
+              <span className="font-display text-xs tracking-[0.12em] whitespace-nowrap text-ink-muted">
                 {dateLine}
               </span>
             </div>
@@ -329,7 +299,7 @@ export default function Home() {
         </div>
 
         <section className="mt-6 space-y-5" data-section="story">
-          <Narration text={body} streaming={streaming} />
+          <Narration text={story.text} streaming={streaming} />
           {streaming && stalled && selectedId && (
             <div
               className="enter flex items-center gap-3 text-sm text-ink-muted"
