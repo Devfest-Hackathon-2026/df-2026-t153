@@ -35,7 +35,7 @@ export default function HeroCrop({ src, box, name }: Props) {
     : null;
 
   // Edge to edge: the parent has px-4, so pull out by -mx-4. The name is not
-  // repeated here; it stands in vertical type above the photo (D-39)
+  // repeated here; it stands in vertical type above the photo (D-38)
   return (
     <figure className="relative -mx-4 overflow-hidden bg-cream">
       {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL; only used to learn the natural size */}

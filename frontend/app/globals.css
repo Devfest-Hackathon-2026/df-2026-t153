@@ -10,7 +10,7 @@
   --font-display:
     var(--font-shippori-mincho), var(--font-noto-serif-jp),
     "Hiragino Mincho ProN", serif;
-  /* 和紙と墨 (D-39): unbleached paper, sumi ink, vermilion seal, indigo for links */
+  /* 和紙と墨 (D-38): unbleached paper, sumi ink, vermilion seal, indigo for links */
   --color-paper: #f2ecdf;
   --color-ink: #2a2825;
   --color-ink-muted: #6b655b;

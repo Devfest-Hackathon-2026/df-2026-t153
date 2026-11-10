@@ -149,7 +149,7 @@ async def _open_stream(jpeg: bytes, prompt: str, grounding: bool) -> _Opened:
             thinking_config=types.ThinkingConfig(thinking_level=THINKING_LEVEL),
         ),
     )
-    # D-41: read up to the first chunk that has text, so 429/503 raised on the first reads are
+    # D-40: read up to the first chunk that has text, so 429/503 raised on the first reads are
     # retried too and the caller's wait_for covers chunks without text (thoughts, grounding
     # metadata only). Those chunks are kept: sources and search suggestions can ride on them.
     prelude: list[_Chunk] = []

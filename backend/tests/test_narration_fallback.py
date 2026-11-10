@@ -1,4 +1,4 @@
-"""D-32 / D-41: no text in time with grounding -> narration retries without it."""
+"""D-32 / D-40: no text in time with grounding -> narration retries without it."""
 
 import asyncio
 from collections.abc import AsyncIterator

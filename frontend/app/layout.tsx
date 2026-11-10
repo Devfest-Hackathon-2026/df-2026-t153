@@ -4,7 +4,7 @@ import "./globals.css";
 
 // Self-hosted at build time by next/font; no request to Google Fonts at runtime.
 // Sans is the interface; Serif is the voice (narration, hint); Shippori is the
-// brush-like display face for names and labels (D-39).
+// brush-like display face for names and labels (D-38).
 const notoSansJP = Noto_Sans_JP({
   subsets: ["latin"],
   display: "swap",
